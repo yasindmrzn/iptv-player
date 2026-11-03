@@ -75,7 +75,6 @@ export const PosterCard = memo(function PosterCard({item, width, onPress, compac
             <Text style={styles.infoTitle} numberOfLines={2}>
               {item.name}
             </Text>
-            <Text style={styles.infoSub}>Ayrıntılar için dokun</Text>
           </View>
         ) : null}
       </Animated.View>

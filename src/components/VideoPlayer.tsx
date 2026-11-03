@@ -8,12 +8,15 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
+  StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Orientation from 'react-native-orientation-locker';
 import Video, {
   ResizeMode,
   ViewType,
@@ -42,6 +45,11 @@ type Props = {
   /** Film/bölüm modu: sarma çubuğu gösterilir, "CANLI" rozeti gizlenir */
   vod?: boolean;
   onStatusChange?: (status: Status) => void;
+  /** Tam ekran kopyası olarak çalışıyor (Modal içinde) */
+  fullscreenMode?: boolean;
+  /** Film/bölüm: bu saniyeden başla (tam ekrana/ekrandan geçişte kaldığı yerden devam) */
+  startAt?: number;
+  onExitFullscreen?: (positionSec: number) => void;
 };
 
 const MAX_AUTO_RETRY = 3;
@@ -49,26 +57,35 @@ const MAX_AUTO_RETRY = 3;
 const START_TIMEOUT_MS = 20000;
 const CONTROLS_HIDE_MS = 3500;
 
-const NATIVE_LABEL = Platform.OS === 'ios' ? 'AVPlayer' : 'ExoPlayer';
-
 /**
- * Canlı yayın için ayarlanmış tamponlar (react-native-video → source.bufferConfig).
- * Android'de Media3 ExoPlayer DefaultLoadControl'e iletilir.
+ * Donmayı önlemek için geniş tamponlar (react-native-video → source.bufferConfig;
+ * Android'de Media3 ExoPlayer DefaultLoadControl'e iletilir).
+ * Canlı: uzun ön tampon + canlı kenardan geride durma (targetOffset) = ağ dalgalanmasına dayanıklı.
+ * Bedel: kanal açılışı birkaç yüz ms uzar, canlı yayın ~15 sn geriden gelir.
  */
-const BUFFER_CONFIG = {
-  minBufferMs: 10000,
-  maxBufferMs: 30000,
-  bufferForPlaybackMs: 2000,
-  bufferForPlaybackAfterRebufferMs: 4000,
+const LIVE_BUFFER = {
+  minBufferMs: 30000,
+  maxBufferMs: 60000,
+  bufferForPlaybackMs: 2500,
+  bufferForPlaybackAfterRebufferMs: 6000,
   backBufferDurationMs: 0,
   cacheSizeMB: 0,
   live: {
-    targetOffsetMs: 8000,
-    minOffsetMs: 4000,
-    maxOffsetMs: 20000,
-    minPlaybackSpeed: 0.97,
-    maxPlaybackSpeed: 1.03,
+    targetOffsetMs: 15000,
+    minOffsetMs: 8000,
+    maxOffsetMs: 40000,
+    minPlaybackSpeed: 0.96,
+    maxPlaybackSpeed: 1.04,
   },
+} as const;
+
+const VOD_BUFFER = {
+  minBufferMs: 40000,
+  maxBufferMs: 120000,
+  bufferForPlaybackMs: 2500,
+  bufferForPlaybackAfterRebufferMs: 8000,
+  backBufferDurationMs: 30000,
+  cacheSizeMB: 0,
 } as const;
 
 function buildHeaders(ch: Channel): Record<string, string> | undefined {
@@ -82,10 +99,11 @@ function buildHeaders(ch: Channel): Record<string, string> | undefined {
   return Object.keys(h).length ? h : undefined;
 }
 
-function buildVlcOptions(ch: Channel): string[] {
+function buildVlcOptions(ch: Channel, vod: boolean): string[] {
   const opts = [
-    '--network-caching=2000',
-    '--live-caching=2000',
+    `--network-caching=${vod ? 8000 : 6000}`,
+    `--live-caching=${vod ? 8000 : 6000}`,
+    '--file-caching=3000',
     '--http-reconnect',
     '--rtsp-tcp',
     // libVLC: mevcut olan en iyi donanım çözücüyü kullan (MediaCodec / VideoToolbox)
@@ -107,6 +125,9 @@ function VideoPlayerBase({
   paused: externalPaused,
   vod = false,
   onStatusChange,
+  fullscreenMode = false,
+  startAt = 0,
+  onExitFullscreen,
 }: Props) {
   const kind = useMemo(
     () => (channel ? detectStreamKind(channel.url) : 'unknown'),
@@ -136,15 +157,16 @@ function VideoPlayerBase({
   const [attempt, setAttempt] = useState(0); // Video bileşenini yeniden kurmak için
   const [userPaused, setUserPaused] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [fill, setFill] = useState(false); // false: sığdır, true: doldur
+  const [fsOpen, setFsOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [notice, setNotice] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [position, setPosition] = useState(0); // sn (yalnızca vod)
   const [duration, setDuration] = useState(0); // sn (yalnızca vod)
   const [vlcSeek, setVlcSeek] = useState<number | undefined>(undefined);
   const [barWidth, setBarWidth] = useState(0);
   const nativeRef = useRef<VideoRef>(null);
+  const resumeRef = useRef(startAt);
+  const positionRef = useRef(0);
 
   const retryCount = useRef(0);
   const triedFallback = useRef(false);
@@ -171,13 +193,13 @@ function VideoPlayerBase({
     }
     retryCount.current = 0;
     triedFallback.current = false;
+    resumeRef.current = startAt;
     engineRef.current = initialEngine;
     setEngine(initialEngine);
     // Not: Video/VLC bileşenlerinin key'i kanal kimliğini içerdiğinden kanal
     // değişince zaten yeniden kurulur; burada ayrıca `attempt` artırılmaz
     // (aksi halde her kanal geçişinde oynatıcı iki kez başlatılırdı).
     setErrorText(null);
-    setNotice(null);
     setUserPaused(false);
     setPosition(0);
     setDuration(0);
@@ -190,6 +212,9 @@ function VideoPlayerBase({
 
   useEffect(
     () => () => {
+      if (!fullscreenMode) {
+        Orientation.lockToPortrait();
+      }
       if (hideTimer.current) {
         clearTimeout(hideTimer.current);
       }
@@ -212,7 +237,6 @@ function VideoPlayerBase({
         engineRef.current = 'vlc';
         setEngine('vlc');
         setAttempt(a => a + 1);
-        setNotice('Bu yayın VLC motoruyla açılıyor');
         updateStatus('loading');
         return;
       }
@@ -221,7 +245,6 @@ function VideoPlayerBase({
         const delay = 1000 * 2 ** retryCount.current;
         retryCount.current += 1;
         updateStatus('loading');
-        setNotice(`Yeniden bağlanılıyor (${retryCount.current}/${MAX_AUTO_RETRY})`);
         if (retryTimer.current) {
           clearTimeout(retryTimer.current);
         }
@@ -230,15 +253,14 @@ function VideoPlayerBase({
       }
       // 3) Pes et
       setErrorText(reason);
-      setNotice(null);
-      updateStatus('error');
+        updateStatus('error');
     },
     [channel, updateStatus],
   );
 
   // ── Başlatma zaman aşımı bekçisi ───────────────────────────────────────
   useEffect(() => {
-    if (!channel) {
+    if (!channel || fsOpen) {
       return;
     }
     const t = setTimeout(() => {
@@ -247,11 +269,10 @@ function VideoPlayerBase({
       }
     }, vod ? START_TIMEOUT_MS * 2 : START_TIMEOUT_MS);
     return () => clearTimeout(t);
-  }, [channel, attempt, engine, handleFailure, vod]);
+  }, [channel, attempt, engine, handleFailure, vod, fsOpen]);
 
   const markPlaying = useCallback(() => {
     retryCount.current = 0;
-    setNotice(null);
     updateStatus('playing');
   }, [updateStatus]);
 
@@ -275,18 +296,6 @@ function VideoPlayerBase({
     }
   }, [controlsVisible, showControls]);
 
-  const switchEngine = useCallback(() => {
-    const next: PlayerEngine = engineRef.current === 'native' ? 'vlc' : 'native';
-    engineRef.current = next;
-    triedFallback.current = true; // elle seçildi; otomatik geri dönüş döngüsü olmasın
-    retryCount.current = 0;
-    setEngine(next);
-    setAttempt(a => a + 1);
-    setErrorText(null);
-    updateStatus('loading');
-    showControls();
-  }, [showControls, updateStatus]);
-
   const manualRetry = useCallback(() => {
     retryCount.current = 0;
     setErrorText(null);
@@ -304,9 +313,9 @@ function VideoPlayerBase({
       type: nativeSourceType(kind),
       headers: buildHeaders(channel),
       minLoadRetryCount: 5,
-      bufferConfig: BUFFER_CONFIG,
+      bufferConfig: vod ? VOD_BUFFER : LIVE_BUFFER,
     };
-  }, [channel, kind]);
+  }, [channel, kind, vod]);
 
   const vlcSource = useMemo(() => {
     if (!channel) {
@@ -315,12 +324,12 @@ function VideoPlayerBase({
     return {
       uri: channel.url.split('|')[0],
       initType: 2 as const,
-      initOptions: buildVlcOptions(channel),
+      initOptions: buildVlcOptions(channel, vod),
     };
-  }, [channel]);
+  }, [channel, vod]);
 
   const paused = userPaused || !!externalPaused;
-  const resizeMode = fill ? ResizeMode.COVER : ResizeMode.CONTAIN;
+  const resizeMode = ResizeMode.CONTAIN;
 
   // ── Oynatıcı olayları ──────────────────────────────────────────────────
   const onNativeBuffer = useCallback(
@@ -354,6 +363,24 @@ function VideoPlayerBase({
     [handleFailure],
   );
 
+  const enterFullscreen = () => {
+    Orientation.lockToLandscape();
+    setFsOpen(true);
+  };
+  const leaveFullscreen = (pos: number) => {
+    Orientation.lockToPortrait();
+    resumeRef.current = vod ? pos : 0;
+    setFsOpen(false);
+    setAttempt(a => a + 1); // canlıda yayına yeniden bağlan, filmde kaldığı yerden devam et
+  };
+  const toggleFullscreen = () => {
+    if (fullscreenMode) {
+      onExitFullscreen?.(positionRef.current);
+    } else {
+      enterFullscreen();
+    }
+  };
+
   const seekTo = (sec: number) => {
     const t = Math.max(0, duration > 0 ? Math.min(duration - 1, sec) : sec);
     setPosition(t);
@@ -370,7 +397,6 @@ function VideoPlayerBase({
     return (
       <View style={[styles.container, styles.center]}>
         <Text style={styles.emptyTitle}>Bir kanal seçin</Text>
-        <Text style={styles.emptySub}>Listeden dokunarak yayını başlatın</Text>
       </View>
     );
   }
@@ -378,8 +404,8 @@ function VideoPlayerBase({
   const isBusy = status === 'loading' || status === 'buffering';
 
   return (
-    <View style={styles.container}>
-      {engine === 'native' ? (
+    <View style={fullscreenMode ? styles.containerFull : styles.container}>
+      {fsOpen ? null : engine === 'native' ? (
         <Video
           ref={nativeRef}
           key={`n-${channel.id}-${attempt}`}
@@ -395,18 +421,23 @@ function VideoPlayerBase({
           preventsDisplaySleepDuringVideoPlayback
           progressUpdateInterval={vod ? 500 : 2000}
           automaticallyWaitsToMinimizeStalling
-          preferredForwardBufferDuration={10}
+          preferredForwardBufferDuration={30}
           onLoadStart={() => updateStatus('loading')}
           onReadyForDisplay={markPlaying}
           onBuffer={onNativeBuffer}
           onLoad={d => {
             if (vod) {
               setDuration(d.duration);
+              if (resumeRef.current > 1) {
+                nativeRef.current?.seek(resumeRef.current);
+                resumeRef.current = 0;
+              }
             }
           }}
           onProgress={p => {
             if (vod) {
               setPosition(p.currentTime);
+              positionRef.current = p.currentTime;
             }
             if (statusRef.current !== 'playing' && !paused) {
               markPlaying();
@@ -422,7 +453,7 @@ function VideoPlayerBase({
           source={vlcSource!}
           paused={paused}
           muted={muted}
-          resizeMode={fill ? 'cover' : 'contain'}
+          resizeMode="contain"
           autoplay
           autoAspectRatio
           seek={vlcSeek}
@@ -438,6 +469,11 @@ function VideoPlayerBase({
               const dur = e.duration > 100000 ? e.duration / 1000 : e.duration;
               setDuration(dur);
               setPosition(e.position * dur);
+              positionRef.current = e.position * dur;
+              if (resumeRef.current > 1 && dur > 0) {
+                setVlcSeek(resumeRef.current / dur);
+                resumeRef.current = 0;
+              }
             }
             if (statusRef.current !== 'playing' && !paused) {
               markPlaying();
@@ -453,8 +489,7 @@ function VideoPlayerBase({
 
       {isBusy && (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.center]}>
-          <ActivityIndicator size="large" color="#fff" />
-          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+          <ActivityIndicator size="large" color={colors.gold} />
         </View>
       )}
 
@@ -466,16 +501,9 @@ function VideoPlayerBase({
               {errorText}
             </Text>
           ) : null}
-          <View style={styles.row}>
-            <Pressable style={styles.primaryBtn} onPress={manualRetry}>
-              <Text style={styles.primaryBtnText}>Tekrar dene</Text>
-            </Pressable>
-            <Pressable style={styles.ghostBtn} onPress={switchEngine}>
-              <Text style={styles.ghostBtnText}>
-                {engine === 'native' ? 'VLC ile dene' : `${NATIVE_LABEL} ile dene`}
-              </Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.primaryBtn} onPress={manualRetry}>
+            <Text style={styles.primaryBtnText}>Tekrar dene</Text>
+          </Pressable>
         </View>
       )}
 
@@ -489,21 +517,11 @@ function VideoPlayerBase({
             <Text style={styles.liveText}>CANLI</Text>
           </View>
         )}
-        {controlsVisible && (
-          <View style={styles.engineBadge}>
-            <Text style={styles.engineText}>
-              {engine === 'vlc' ? 'VLC' : NATIVE_LABEL}
-            </Text>
-          </View>
-        )}
       </View>
 
       {/* Alt kontroller */}
       {controlsVisible && status !== 'error' && (
         <View style={styles.bottomBar}>
-          <Text style={styles.channelName} numberOfLines={1}>
-            {channel.name}
-          </Text>
           {vod && (
             <View style={styles.seekRow}>
               <Text style={styles.timeText}>{formatTime(position)}</Text>
@@ -527,38 +545,52 @@ function VideoPlayerBase({
               <Text style={styles.timeText}>{formatTime(duration)}</Text>
             </View>
           )}
-          <View style={styles.row}>
-            {vod && <CtrlButton label="−10 sn" wide onPress={() => seekTo(position - 10)} />}
-            <CtrlButton
-              label={paused ? '▶' : '❚❚'}
-              onPress={() => {
-                setUserPaused(p => !p);
-                showControls();
-              }}
-            />
-            {vod && <CtrlButton label="+10 sn" wide onPress={() => seekTo(position + 10)} />}
-            <CtrlButton
-              label={muted ? '🔇' : '🔊'}
-              onPress={() => {
-                setMuted(m => !m);
-                showControls();
-              }}
-            />
-            <CtrlButton
-              label={fill ? 'Sığdır' : 'Doldur'}
-              wide
-              onPress={() => {
-                setFill(f => !f);
-                showControls();
-              }}
-            />
-            <CtrlButton
-              label={engine === 'native' ? 'VLC' : NATIVE_LABEL}
-              wide
-              onPress={switchEngine}
-            />
+          <View style={styles.controlsRow}>
+            <View style={styles.row}>
+              <CtrlButton
+                label={paused ? '▶' : '❚❚'}
+                onPress={() => {
+                  setUserPaused(p => !p);
+                  showControls();
+                }}
+              />
+              {vod && <CtrlButton label="−10" onPress={() => seekTo(position - 10)} />}
+              {vod && <CtrlButton label="+10" onPress={() => seekTo(position + 10)} />}
+              <CtrlButton
+                label={muted ? '🔇' : '🔊'}
+                onPress={() => {
+                  setMuted(m => !m);
+                  showControls();
+                }}
+              />
+            </View>
+            <CtrlButton label={fullscreenMode ? '⤡' : '⤢'} onPress={toggleFullscreen} />
           </View>
         </View>
+      )}
+
+      {/* Tam ekran: yatay Modal içinde ikinci bir oynatıcı; satır içi olan susturulur */}
+      {!fullscreenMode && (
+        <Modal
+          visible={fsOpen}
+          animationType="fade"
+          supportedOrientations={['landscape', 'landscape-left', 'landscape-right']}
+          statusBarTranslucent
+          onRequestClose={() => leaveFullscreen(positionRef.current)}>
+          <StatusBar hidden />
+          <View style={styles.fsRoot}>
+            {fsOpen ? (
+              <VideoPlayer
+                channel={channel}
+                vod={vod}
+                fullscreenMode
+                startAt={vod ? positionRef.current : 0}
+                onExitFullscreen={leaveFullscreen}
+                onStatusChange={onStatusChange}
+              />
+            ) : null}
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -608,11 +640,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     overflow: 'hidden',
   },
+  containerFull: {flex: 1, width: '100%', backgroundColor: '#000', overflow: 'hidden'},
+  fsRoot: {flex: 1, backgroundColor: '#000'},
+  controlsRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   center: {alignItems: 'center', justifyContent: 'center'},
   row: {flexDirection: 'row', alignItems: 'center', gap: 8},
   emptyTitle: {color: '#fff', fontSize: 16, fontFamily: fonts.semi},
-  emptySub: {color: colors.textDim, fontSize: 13, marginTop: 4},
-  notice: {color: '#d0d0d4', fontSize: 12, marginTop: 10},
   errorBg: {backgroundColor: 'rgba(0,0,0,0.78)', paddingHorizontal: 24},
   errorTitle: {color: '#fff', fontSize: 16, fontFamily: fonts.bold},
   errorSub: {
@@ -628,15 +661,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  primaryBtnText: {color: '#fff', fontFamily: fonts.semi, fontSize: 14},
-  ghostBtn: {
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.textFaint,
-  },
-  ghostBtnText: {color: '#e5e5e8', fontFamily: fonts.medium, fontSize: 14},
+  primaryBtnText: {color: colors.onAccent, fontFamily: fonts.semi, fontSize: 14},
   topBar: {
     position: 'absolute',
     top: 8,
@@ -657,13 +682,6 @@ const styles = StyleSheet.create({
   },
   liveDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: colors.live},
   liveText: {color: '#fff', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.6},
-  engineBadge: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  engineText: {color: '#c8c8cc', fontSize: 11, fontFamily: fonts.semi},
   bottomBar: {
     position: 'absolute',
     left: 0,
@@ -675,18 +693,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
     gap: 8,
   },
-  channelName: {color: '#fff', fontSize: 14, fontFamily: fonts.semi},
   ctrl: {
     minWidth: 40,
     height: 34,
     borderRadius: 8,
-    backgroundColor: 'rgba(139,92,246,0.28)',
+    backgroundColor: 'rgba(212,175,55,0.26)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
   },
   ctrlWide: {paddingHorizontal: 14},
-  ctrlPressed: {backgroundColor: 'rgba(139,92,246,0.55)'},
+  ctrlPressed: {backgroundColor: 'rgba(212,175,55,0.55)'},
   ctrlText: {color: '#fff', fontSize: 13, fontFamily: fonts.semi},
   seekRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
   seekTrack: {

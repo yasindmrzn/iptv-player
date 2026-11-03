@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {Alert, BackHandler, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {Alert, AppState, BackHandler, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
 import {DetailSheet} from './src/components/DetailSheet';
@@ -41,7 +41,6 @@ export default function App() {
   const hydrated = useIptvStore(s => s.hydrated);
   const account = useIptvStore(s => s.account);
   const info = useIptvStore(s => s.accountInfo);
-  const refreshAccount = useIptvStore(s => s.refreshAccount);
 
   const [tab, setTab] = useState<TabKey>('home');
   const [overlays, setOverlays] = useState<Overlay[]>([]);
@@ -51,15 +50,39 @@ export default function App() {
   const pushOverlay = useCallback((o: Overlay) => setOverlays(s => [...s, o]), []);
   const popOverlay = useCallback(() => setOverlays(s => s.slice(0, -1)), []);
 
+  // Yeni eklenen kanal/film/dizilerin otomatik görünmesi: her açılışta ve
+  // uygulama uzun süre arka planda kaldıktan sonra öne gelince listeler sunucudan yeniden çekilir.
+  const refreshAll = useCallback(() => {
+    void useIptvStore.getState().refreshAccount();
+    void useIptvStore.getState().loadLive(true);
+    void useCatalogStore.getState().loadVod(true);
+    void useCatalogStore.getState().loadSeries(true);
+  }, []);
+
   useEffect(() => {
     if (account) {
-      void refreshAccount();
+      refreshAll();
     } else {
       setTab('home');
       setOverlays([]);
       setDetail(null);
     }
-  }, [account, refreshAccount]);
+  }, [account?.server, account?.username, !!account]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let leftAt = 0;
+    const sub = AppState.addEventListener('change', st => {
+      if (st === 'background') {
+        leftAt = Date.now();
+      } else if (st === 'active' && leftAt && Date.now() - leftAt > 10 * 60 * 1000) {
+        leftAt = 0;
+        if (useIptvStore.getState().account) {
+          refreshAll();
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [refreshAll]);
 
   // Android geri tuşu: üst katman → ana sayfa sekmesi → uygulamadan çık
   useEffect(() => {

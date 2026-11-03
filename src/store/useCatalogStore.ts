@@ -55,11 +55,12 @@ export const useCatalogStore = create<State>((set, get) => ({
       ]);
       set({vod: {cats, items, loading: false, error: null, loaded: true}});
     } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Filmler yüklenemedi.';
+      // Yenileme başarısız olursa eldeki liste korunur
       set({
-        vod: {
-          ...empty<VodItem>(),
-          error: e instanceof Error ? e.message : 'Filmler yüklenemedi.',
-        },
+        vod: cur.loaded
+          ? {...cur, loading: false, error: null}
+          : {...empty<VodItem>(), error: msg},
       });
     }
   },
@@ -78,11 +79,12 @@ export const useCatalogStore = create<State>((set, get) => ({
       ]);
       set({series: {cats, items, loading: false, error: null, loaded: true}});
     } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Diziler yüklenemedi.';
+      // Yenileme başarısız olursa eldeki liste korunur
       set({
-        series: {
-          ...empty<SeriesItem>(),
-          error: e instanceof Error ? e.message : 'Diziler yüklenemedi.',
-        },
+        series: cur.loaded
+          ? {...cur, loading: false, error: null}
+          : {...empty<SeriesItem>(), error: msg},
       });
     }
   },
