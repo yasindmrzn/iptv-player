@@ -22,16 +22,17 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Android SDK bileşenlerini kur (yeniden denemeli)
+      - name: Android NDK'yı kur (yeniden denemeli)
         run: |
           SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" --list 2>/dev/null | grep -E "platforms;android-3[6-9]|build-tools;3[6-9]" | head -10 || true
           for i in 1 2 3; do
-            if "$SDKM" "platforms;android-37" "build-tools;37.0.0" "ndk;27.1.12297006"; then
+            rm -rf "$ANDROID_HOME/ndk/27.1.12297006"
+            if "$SDKM" "ndk;27.1.12297006"; then
               exit 0
             fi
-            echo "Deneme $i başarısız, tekrar deneniyor..."
-            rm -rf "$ANDROID_HOME/ndk/27.1.12297006"
+            echo "NDK deneme $i başarısız, tekrar deneniyor..."
             sleep 10
           done
           exit 1
