@@ -1,7 +1,7 @@
 import React, {useEffect, useRef} from 'react';
 import {Animated, Easing, StyleSheet, Text, View} from 'react-native';
 
-import {colors} from '../theme';
+import {colors, fonts} from '../theme';
 
 type Props = {onDone: () => void};
 
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: 36,
-    fontWeight: '800',
+    fontFamily: fonts.xbold,
     letterSpacing: 9,
     paddingLeft: 9, // letterSpacing'in sağa kaydırdığı boşluğu dengeler
   },
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   tagline: {
     color: colors.gold,
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semi,
     letterSpacing: 7,
     paddingLeft: 7,
     marginTop: 16,

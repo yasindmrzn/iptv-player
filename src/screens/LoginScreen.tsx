@@ -14,7 +14,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {FadeIn} from '../components/FadeIn';
 import {PressableScale} from '../components/PressableScale';
 import {useIptvStore} from '../store/useIptvStore';
-import {colors} from '../theme';
+import {colors, fonts} from '../theme';
 
 type InputRef = React.ComponentRef<typeof TextInput>;
 
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   brand: {
     color: colors.text,
     fontSize: 32,
-    fontWeight: '800',
+    fontFamily: fonts.xbold,
     letterSpacing: 8,
     paddingLeft: 8,
   },
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   tagline: {
     color: colors.gold,
     fontSize: 11,
-    fontWeight: '600',
+    fontFamily: fonts.semi,
     letterSpacing: 6,
     paddingLeft: 6,
     marginTop: 12,
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  cardTitle: {color: colors.text, fontSize: 20, fontWeight: '700'},
+  cardTitle: {color: colors.text, fontSize: 20, fontFamily: fonts.bold},
   cardSub: {color: colors.textDim, fontSize: 13, marginTop: 4, marginBottom: 18},
   field: {marginBottom: 14},
   label: {color: colors.textDim, fontSize: 12, marginBottom: 6, letterSpacing: 0.4},
@@ -212,5 +212,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 6,
   },
-  buttonText: {color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 2},
+  buttonText: {color: colors.onAccent, fontSize: 15, fontFamily: fonts.xbold, letterSpacing: 2},
 });

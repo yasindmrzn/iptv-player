@@ -12,7 +12,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {useCatalogStore} from '../store/useCatalogStore';
-import {colors} from '../theme';
+import {colors, fonts} from '../theme';
 import type {Episode, SeriesItem} from '../types';
 
 type Props = {
@@ -173,16 +173,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surfaceAlt,
   },
-  backText: {color: colors.text, fontSize: 13, fontWeight: '600'},
-  headerTitle: {flex: 1, color: colors.text, fontSize: 15, fontWeight: '700', textAlign: 'center'},
+  backText: {color: colors.text, fontSize: 13, fontFamily: fonts.semi},
+  headerTitle: {flex: 1, color: colors.text, fontSize: 15, fontFamily: fonts.bold, textAlign: 'center'},
   content: {paddingHorizontal: 14, paddingBottom: 28},
   hero: {flexDirection: 'row', gap: 14, paddingTop: 8, paddingBottom: 16},
   cover: {width: 112, height: 168, borderRadius: 12, backgroundColor: colors.surfaceAlt},
   coverFallback: {alignItems: 'center', justifyContent: 'center'},
-  coverLetter: {color: colors.accent, fontSize: 40, fontWeight: '800'},
+  coverLetter: {color: colors.accent, fontSize: 40, fontFamily: fonts.xbold},
   heroText: {flex: 1},
-  name: {color: colors.text, fontSize: 20, fontWeight: '800'},
-  rating: {color: colors.gold, fontSize: 13, fontWeight: '700', marginTop: 6},
+  name: {color: colors.text, fontSize: 20, fontFamily: fonts.xbold},
+  rating: {color: colors.gold, fontSize: 13, fontFamily: fonts.bold, marginTop: 6},
   plot: {color: colors.textDim, fontSize: 13, lineHeight: 19, marginTop: 8},
   seasons: {gap: 8, paddingBottom: 12},
   seasonChip: {
@@ -194,8 +194,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   seasonChipActive: {backgroundColor: colors.accent},
-  seasonText: {color: colors.textDim, fontSize: 13, fontWeight: '600'},
-  seasonTextActive: {color: '#fff'},
+  seasonText: {color: colors.textDim, fontSize: 13, fontFamily: fonts.semi},
+  seasonTextActive: {color: colors.onAccent},
   episode: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -217,13 +217,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  epNumText: {color: colors.gold, fontWeight: '800', fontSize: 14},
+  epNumText: {color: colors.gold, fontFamily: fonts.xbold, fontSize: 14},
   epInfo: {flex: 1, marginHorizontal: 12},
-  epTitle: {color: colors.text, fontSize: 14, fontWeight: '600'},
+  epTitle: {color: colors.text, fontSize: 14, fontFamily: fonts.semi},
   epMeta: {color: colors.textFaint, fontSize: 11, marginTop: 2},
   play: {color: colors.gold, fontSize: 16},
   emptyBox: {alignItems: 'center', paddingTop: 30, gap: 10},
   emptyText: {color: colors.textDim, fontSize: 14, textAlign: 'center'},
   retryBtn: {backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 10},
-  retryText: {color: '#fff', fontWeight: '700', fontSize: 14},
+  retryText: {color: colors.onAccent, fontFamily: fonts.bold, fontSize: 14},
 });

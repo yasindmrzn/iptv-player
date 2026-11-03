@@ -1,7 +1,7 @@
 import React, {memo, useState} from 'react';
 import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 
-import {colors, ROW_HEIGHT} from '../theme';
+import {colors, ROW_HEIGHT, fonts} from '../theme';
 import type {Channel} from '../types';
 
 type Props = {
@@ -107,9 +107,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   logo: {width: 38, height: 38},
-  initial: {color: colors.textDim, fontSize: 18, fontWeight: '700'},
+  initial: {color: colors.textDim, fontSize: 18, fontFamily: fonts.bold},
   info: {flex: 1, justifyContent: 'center'},
-  name: {color: colors.text, fontSize: 15, fontWeight: '600'},
+  name: {color: colors.text, fontSize: 15, fontFamily: fonts.semi},
   nameActive: {color: colors.accent},
   sub: {color: colors.textDim, fontSize: 12, marginTop: 2},
   track: {

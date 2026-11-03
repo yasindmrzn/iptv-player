@@ -1,29 +1,38 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {BackHandler, StatusBar, View} from 'react-native';
-import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {Alert, BackHandler, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
+import {DetailSheet} from './src/components/DetailSheet';
 import {FadeIn} from './src/components/FadeIn';
 import {SplashScreen} from './src/components/SplashScreen';
+import {TopTabs, type TabKey} from './src/components/TopTabs';
 import {CatalogScreen} from './src/screens/CatalogScreen';
-import {HomeScreen} from './src/screens/HomeScreen';
+import {DashboardScreen} from './src/screens/DashboardScreen';
+import {FavoritesScreen} from './src/screens/FavoritesScreen';
 import {LoginScreen} from './src/screens/LoginScreen';
 import {MainScreen} from './src/screens/MainScreen';
 import {PlayerScreen} from './src/screens/PlayerScreen';
 import {SeriesDetailScreen} from './src/screens/SeriesDetailScreen';
 import {episodeUrl, vodUrl} from './src/services/xtream';
+import {useCatalogStore} from './src/store/useCatalogStore';
 import {useIptvStore} from './src/store/useIptvStore';
-import {colors} from './src/theme';
+import {colors, fonts} from './src/theme';
 import type {Channel, Episode, SeriesItem, VodItem} from './src/types';
 
-type Route =
-  | {name: 'home'}
-  | {name: 'live'}
-  | {name: 'vod'}
-  | {name: 'series'}
+type Overlay =
   | {name: 'seriesDetail'; series: SeriesItem}
   | {name: 'player'; channel: Channel; title: string; subtitle?: string};
 
-const HOME: Route = {name: 'home'};
+type Detail = {kind: 'vod'; item: VodItem} | {kind: 'series'; item: SeriesItem};
+
+function formatExpiry(ms?: number): string | null {
+  if (!ms) {
+    return null;
+  }
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
+}
 
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
@@ -31,48 +40,80 @@ export default function App() {
 
   const hydrated = useIptvStore(s => s.hydrated);
   const account = useIptvStore(s => s.account);
-  const [stack, setStack] = useState<Route[]>([HOME]);
-  const route = stack[stack.length - 1];
+  const info = useIptvStore(s => s.accountInfo);
+  const refreshAccount = useIptvStore(s => s.refreshAccount);
 
-  const push = useCallback((r: Route) => setStack(s => [...s, r]), []);
-  const pop = useCallback(
-    () => setStack(s => (s.length > 1 ? s.slice(0, -1) : s)),
-    [],
-  );
+  const [tab, setTab] = useState<TabKey>('home');
+  const [overlays, setOverlays] = useState<Overlay[]>([]);
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const overlay = overlays[overlays.length - 1];
 
-  // Çıkış yapılınca yığını sıfırla
+  const pushOverlay = useCallback((o: Overlay) => setOverlays(s => [...s, o]), []);
+  const popOverlay = useCallback(() => setOverlays(s => s.slice(0, -1)), []);
+
   useEffect(() => {
-    if (!account) {
-      setStack([HOME]);
+    if (account) {
+      void refreshAccount();
+    } else {
+      setTab('home');
+      setOverlays([]);
+      setDetail(null);
     }
-  }, [account]);
+  }, [account, refreshAccount]);
 
-  // Android geri tuşu: önce üst ekrandan çık; ana menüde uygulamadan çıkma
+  // Android geri tuşu: üst katman → ana sayfa sekmesi → uygulamadan çık
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (stack.length > 1) {
-        pop();
+      if (detail) {
+        setDetail(null);
+        return true;
+      }
+      if (overlays.length > 0) {
+        popOverlay();
+        return true;
+      }
+      if (tab !== 'home') {
+        setTab('home');
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [stack.length, pop]);
+  }, [detail, overlays.length, tab, popOverlay]);
 
-  const playVod = useCallback(
-    (v: VodItem) => {
-      const acc = useIptvStore.getState().account;
-      if (!acc) {
-        return;
-      }
-      push({
+  const openItem = useCallback((kind: 'vod' | 'series', item: VodItem | SeriesItem) => {
+    setDetail(kind === 'vod' ? {kind, item: item as VodItem} : {kind, item: item as SeriesItem});
+  }, []);
+
+  const openChannel = useCallback((c: Channel) => {
+    useIptvStore.getState().selectChannel(c);
+    setTab('live');
+  }, []);
+
+  const onSheetPrimary = useCallback(() => {
+    const acc = useIptvStore.getState().account;
+    if (!detail || !acc) {
+      return;
+    }
+    const {addRecent} = useIptvStore.getState();
+    setDetail(null);
+    if (detail.kind === 'vod') {
+      addRecent({kind: 'vod', item: detail.item, ts: Date.now()});
+      pushOverlay({
         name: 'player',
-        channel: {id: `vod-${v.id}`, name: v.name, url: vodUrl(acc, v), group: 'VOD'},
-        title: v.name,
+        channel: {
+          id: `vod-${detail.item.id}`,
+          name: detail.item.name,
+          url: vodUrl(acc, detail.item),
+          group: 'VOD',
+        },
+        title: detail.item.name,
       });
-    },
-    [push],
-  );
+    } else {
+      addRecent({kind: 'series', item: detail.item, ts: Date.now()});
+      pushOverlay({name: 'seriesDetail', series: detail.item});
+    }
+  }, [detail, pushOverlay]);
 
   const playEpisode = useCallback(
     (e: Episode, s: SeriesItem) => {
@@ -80,7 +121,7 @@ export default function App() {
       if (!acc) {
         return;
       }
-      push({
+      pushOverlay({
         name: 'player',
         channel: {
           id: `ep-${e.id}`,
@@ -92,60 +133,87 @@ export default function App() {
         subtitle: `${e.season}. Sezon · ${e.number}. Bölüm — ${e.title}`,
       });
     },
-    [push],
+    [pushOverlay],
   );
 
+  const confirmLogout = () =>
+    Alert.alert('Çıkış yap', 'Hesaptan çıkış yapılsın mı?', [
+      {text: 'Vazgeç', style: 'cancel'},
+      {
+        text: 'Çıkış yap',
+        style: 'destructive',
+        onPress: () => {
+          useCatalogStore.getState().reset();
+          useIptvStore.getState().logout();
+        },
+      },
+    ]);
+
   let content: React.ReactNode = null;
+  let contentKey = 'login';
   if (hydrated) {
     if (!account) {
       content = <LoginScreen />;
+    } else if (overlay?.name === 'seriesDetail') {
+      contentKey = `series-${overlay.series.id}`;
+      content = (
+        <SeriesDetailScreen series={overlay.series} onBack={popOverlay} onPlay={playEpisode} />
+      );
+    } else if (overlay?.name === 'player') {
+      contentKey = `player-${overlay.channel.id}`;
+      content = (
+        <PlayerScreen
+          channel={overlay.channel}
+          title={overlay.title}
+          subtitle={overlay.subtitle}
+          onBack={popOverlay}
+        />
+      );
     } else {
-      switch (route.name) {
-        case 'home':
-          content = <HomeScreen onOpen={name => push({name})} />;
-          break;
-        case 'live':
-          content = <MainScreen onBack={pop} />;
-          break;
-        case 'vod':
-          content = (
-            <CatalogScreen mode="vod" onBack={pop} onSelect={i => playVod(i as VodItem)} />
-          );
-          break;
-        case 'series':
-          content = (
-            <CatalogScreen
-              mode="series"
-              onBack={pop}
-              onSelect={i => push({name: 'seriesDetail', series: i as SeriesItem})}
-            />
-          );
-          break;
-        case 'seriesDetail':
-          content = (
-            <SeriesDetailScreen series={route.series} onBack={pop} onPlay={playEpisode} />
-          );
-          break;
-        case 'player':
-          content = (
-            <PlayerScreen
-              channel={route.channel}
-              title={route.title}
-              subtitle={route.subtitle}
-              onBack={pop}
-            />
-          );
-          break;
-      }
+      contentKey = 'shell';
+      const expiry = formatExpiry(info?.expiresAt);
+      content = (
+        <SafeAreaView style={styles.shell} edges={['top']}>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.logo}>PASHAPLAY</Text>
+              {expiry ? <Text style={styles.expiry}>Bitiş · {expiry}</Text> : null}
+            </View>
+            <Pressable onPress={confirmLogout} hitSlop={10} style={styles.logout}>
+              <Text style={styles.logoutText}>Çıkış</Text>
+            </Pressable>
+          </View>
+          <TopTabs active={tab} onChange={setTab} />
+          <FadeIn key={tab} style={styles.body}>
+            {tab === 'home' && (
+              <DashboardScreen onOpenItem={openItem} onOpenChannel={openChannel} onTab={setTab} />
+            )}
+            {tab === 'live' && <MainScreen />}
+            {tab === 'vod' && (
+              <CatalogScreen mode="vod" onSelect={i => openItem('vod', i as VodItem)} />
+            )}
+            {tab === 'series' && (
+              <CatalogScreen mode="series" onSelect={i => openItem('series', i as SeriesItem)} />
+            )}
+            {tab === 'favorites' && <FavoritesScreen onOpenChannel={openChannel} />}
+          </FadeIn>
+          <DetailSheet
+            visible={!!detail}
+            kind={detail?.kind ?? 'vod'}
+            item={detail?.item ?? null}
+            onClose={() => setDetail(null)}
+            onPrimary={onSheetPrimary}
+          />
+        </SafeAreaView>
+      );
     }
   }
 
   return (
     <SafeAreaProvider style={{backgroundColor: colors.bg}}>
       <StatusBar barStyle="light-content" />
-      {/* Ekranlar arkada hazırlanır; açılış ekranı üstte oynar */}
       <View style={{flex: 1, backgroundColor: colors.bg}}>
-        <FadeIn key={account ? route.name : 'login'} style={{flex: 1}}>
+        <FadeIn key={contentKey} style={{flex: 1}}>
           {content}
         </FadeIn>
       </View>
@@ -157,3 +225,27 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  shell: {flex: 1, backgroundColor: colors.bg},
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  logo: {color: colors.gold, fontSize: 19, fontFamily: fonts.xbold, letterSpacing: 5},
+  expiry: {color: colors.textFaint, fontSize: 10, marginTop: 2, letterSpacing: 0.4},
+  logout: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 14,
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  logoutText: {color: colors.text, fontSize: 12, fontFamily: fonts.semi},
+  body: {flex: 1},
+});

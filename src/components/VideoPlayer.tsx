@@ -24,7 +24,7 @@ import Video, {
 } from 'react-native-video';
 import {VLCPlayer} from 'react-native-vlc-media-player';
 
-import {colors} from '../theme';
+import {colors, fonts} from '../theme';
 import type {Channel, PlayerEngine} from '../types';
 import {
   chooseEngine,
@@ -610,11 +610,11 @@ const styles = StyleSheet.create({
   },
   center: {alignItems: 'center', justifyContent: 'center'},
   row: {flexDirection: 'row', alignItems: 'center', gap: 8},
-  emptyTitle: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  emptyTitle: {color: '#fff', fontSize: 16, fontFamily: fonts.semi},
   emptySub: {color: colors.textDim, fontSize: 13, marginTop: 4},
   notice: {color: '#d0d0d4', fontSize: 12, marginTop: 10},
   errorBg: {backgroundColor: 'rgba(0,0,0,0.78)', paddingHorizontal: 24},
-  errorTitle: {color: '#fff', fontSize: 16, fontWeight: '700'},
+  errorTitle: {color: '#fff', fontSize: 16, fontFamily: fonts.bold},
   errorSub: {
     color: '#a0a0a6',
     fontSize: 12,
@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  primaryBtnText: {color: '#fff', fontWeight: '600', fontSize: 14},
+  primaryBtnText: {color: '#fff', fontFamily: fonts.semi, fontSize: 14},
   ghostBtn: {
     borderRadius: 10,
     paddingHorizontal: 16,
@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.textFaint,
   },
-  ghostBtnText: {color: '#e5e5e8', fontWeight: '500', fontSize: 14},
+  ghostBtnText: {color: '#e5e5e8', fontFamily: fonts.medium, fontSize: 14},
   topBar: {
     position: 'absolute',
     top: 8,
@@ -656,14 +656,14 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   liveDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: colors.live},
-  liveText: {color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.6},
+  liveText: {color: '#fff', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.6},
   engineBadge: {
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  engineText: {color: '#c8c8cc', fontSize: 11, fontWeight: '600'},
+  engineText: {color: '#c8c8cc', fontSize: 11, fontFamily: fonts.semi},
   bottomBar: {
     position: 'absolute',
     left: 0,
@@ -675,7 +675,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
     gap: 8,
   },
-  channelName: {color: '#fff', fontSize: 14, fontWeight: '600'},
+  channelName: {color: '#fff', fontSize: 14, fontFamily: fonts.semi},
   ctrl: {
     minWidth: 40,
     height: 34,
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
   },
   ctrlWide: {paddingHorizontal: 14},
   ctrlPressed: {backgroundColor: 'rgba(139,92,246,0.55)'},
-  ctrlText: {color: '#fff', fontSize: 13, fontWeight: '600'},
+  ctrlText: {color: '#fff', fontSize: 13, fontFamily: fonts.semi},
   seekRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
   seekTrack: {
     flex: 1,

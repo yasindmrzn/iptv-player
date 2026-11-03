@@ -24,13 +24,13 @@ import {EpgStrip} from '../components/EpgStrip';
 import {VideoPlayer} from '../components/VideoPlayer';
 import {getNowNext} from '../services/epg';
 import {useIptvStore} from '../store/useIptvStore';
-import {colors, ROW_HEIGHT} from '../theme';
+import {colors, ROW_HEIGHT, fonts} from '../theme';
 import type {Channel} from '../types';
 
 const SWIPE_THRESHOLD = 48;
 const epgIdOf = (c: Channel) => c.tvgId ?? c.epgChannelId ?? c.id;
 
-export function MainScreen({onBack}: {onBack: () => void}) {
+export function MainScreen() {
   const insets = useSafeAreaInsets();
 
   // ── Store ────────────────────────────────────────────────────────────────
@@ -218,16 +218,7 @@ export function MainScreen({onBack}: {onBack: () => void}) {
   );
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
-      {/* Üst başlık */}
-      <View style={styles.header}>
-        <Pressable onPress={onBack} hitSlop={10} style={styles.headerBtn}>
-          <Text style={styles.headerBtnText}>‹ Menü</Text>
-        </Pressable>
-        <Text style={styles.brand}>CANLI</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
+    <SafeAreaView style={styles.root} edges={[]}>
       {/* Oynatıcı: 16:9, üstte sabit; dikey kaydırma = kanal değiştir */}
       <View {...swipe.panHandlers}>
         <VideoPlayer channel={currentChannel} paused={!appActive} />
@@ -331,7 +322,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
   },
-  brand: {color: colors.gold, fontSize: 17, fontWeight: '800', letterSpacing: 4},
+  brand: {color: colors.gold, fontSize: 17, fontFamily: fonts.xbold, letterSpacing: 4},
   headerBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -339,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   headerSpacer: {width: 64},
-  headerBtnText: {color: colors.text, fontSize: 13, fontWeight: '600'},
+  headerBtnText: {color: colors.text, fontSize: 13, fontFamily: fonts.semi},
   searchWrap: {paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8},
   search: {
     height: 40,
@@ -352,7 +343,7 @@ const styles = StyleSheet.create({
   list: {flex: 1, marginTop: 8},
   emptyBox: {alignItems: 'center', paddingTop: 48, paddingHorizontal: 32, gap: 10},
   emptyText: {color: colors.textDim, fontSize: 14, textAlign: 'center', lineHeight: 20},
-  errorTitle: {color: colors.text, fontSize: 16, fontWeight: '700'},
+  errorTitle: {color: colors.text, fontSize: 16, fontFamily: fonts.bold},
   retryBtn: {
     marginTop: 6,
     backgroundColor: colors.accent,
@@ -360,7 +351,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
-  retryText: {color: '#fff', fontWeight: '700', fontSize: 14},
+  retryText: {color: colors.onAccent, fontFamily: fonts.bold, fontSize: 14},
   zapBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -382,8 +373,8 @@ const styles = StyleSheet.create({
   },
   zapBtnPressed: {backgroundColor: colors.border},
   zapGlyph: {color: colors.text, fontSize: 24, marginTop: -3},
-  zapLabel: {color: colors.text, fontSize: 13, fontWeight: '600'},
+  zapLabel: {color: colors.text, fontSize: 13, fontFamily: fonts.semi},
   zapCenter: {flex: 1, alignItems: 'center'},
-  zapName: {color: colors.text, fontSize: 14, fontWeight: '700'},
+  zapName: {color: colors.text, fontSize: 14, fontFamily: fonts.bold},
   zapSub: {color: colors.textDim, fontSize: 11, marginTop: 2},
 });

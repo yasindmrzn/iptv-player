@@ -3,7 +3,7 @@ import {AppState, Pressable, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {VideoPlayer} from '../components/VideoPlayer';
-import {colors} from '../theme';
+import {colors, fonts} from '../theme';
 import type {Channel} from '../types';
 
 type Props = {
@@ -50,8 +50,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surfaceAlt,
   },
-  backText: {color: colors.text, fontSize: 13, fontWeight: '600'},
+  backText: {color: colors.text, fontSize: 13, fontFamily: fonts.semi},
   info: {padding: 18},
-  title: {color: colors.text, fontSize: 18, fontWeight: '800'},
+  title: {color: colors.text, fontSize: 18, fontFamily: fonts.xbold},
   subtitle: {color: colors.textDim, fontSize: 13, marginTop: 6},
 });

@@ -4,6 +4,7 @@ import type {
   Episode,
   Programme,
   SeriesItem,
+  VodDetails,
   VodItem,
   XtreamCredentials,
 } from '../types';
@@ -297,4 +298,36 @@ export function episodeUrl(c: XtreamCredentials, e: Episode): string {
   return `${normalizeServer(c.server)}/series/${encodeURIComponent(
     c.username,
   )}/${encodeURIComponent(c.password)}/${e.id}.${e.ext}`;
+}
+
+/** Film ayrıntıları (özet, tür, yıl, fragman). Sunucular alanları farklı adlandırabilir. */
+export async function fetchVodDetails(
+  c: XtreamCredentials,
+  vodId: string,
+): Promise<VodDetails> {
+  const data = await getJson<{
+    info?: Record<string, unknown>;
+  }>(apiUrl(c, 'get_vod_info', `&vod_id=${encodeURIComponent(vodId)}`), 30000);
+  const i = data?.info ?? {};
+  const str = (v: unknown) =>
+    typeof v === 'string' || typeof v === 'number'
+      ? String(v).trim() || undefined
+      : undefined;
+  const backdropRaw = i.backdrop_path;
+  return {
+    plot: str(i.plot) ?? str(i.description),
+    genre: str(i.genre),
+    year: str(i.releasedate)?.slice(0, 4) ?? str(i.year),
+    duration: str(i.duration),
+    rating: str(i.rating) ?? str(i.rating_5based),
+    cast: str(i.cast) ?? str(i.actors),
+    director: str(i.director),
+    trailer: str(i.youtube_trailer) ?? str(i.trailer),
+    backdrop: Array.isArray(backdropRaw) ? str(backdropRaw[0]) : str(backdropRaw),
+  };
+}
+
+/** Fragman için açılacak bağlantı (kimlik ya da tam URL kabul eder). */
+export function trailerUrl(t: string): string {
+  return /^https?:\/\//i.test(t) ? t : `https://www.youtube.com/watch?v=${encodeURIComponent(t)}`;
 }

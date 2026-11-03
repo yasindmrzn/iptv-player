@@ -1,9 +1,8 @@
-import React, {memo, useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
-  Pressable,
+    Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,16 +12,15 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-import {PressableScale} from '../components/PressableScale';
+import {PosterCard} from '../components/MediaCard';
 import {useCatalogStore} from '../store/useCatalogStore';
-import {colors} from '../theme';
+import {colors, fonts} from '../theme';
 import type {SeriesItem, VodItem} from '../types';
 
 type Item = VodItem | SeriesItem;
 
 type Props = {
   mode: 'vod' | 'series';
-  onBack: () => void;
   onSelect: (item: Item) => void;
 };
 
@@ -31,38 +29,7 @@ const GAP = 10;
 const PAD = 12;
 const ALL = '__all__';
 
-const Poster = memo(function Poster({
-  item,
-  width,
-  onPress,
-}: {
-  item: Item;
-  width: number;
-  onPress: (i: Item) => void;
-}) {
-  const height = Math.round(width * 1.5);
-  return (
-    <PressableScale style={{width, marginBottom: GAP + 4}} onPress={() => onPress(item)} scaleTo={0.95}>
-      <View style={[styles.poster, {width, height}]}>
-        {item.cover ? (
-          <Image source={{uri: item.cover}} style={{width, height}} resizeMode="cover" />
-        ) : (
-          <Text style={styles.posterFallback}>{item.name.slice(0, 1).toUpperCase()}</Text>
-        )}
-        {item.rating && Number(item.rating) > 0 ? (
-          <View style={styles.ratingBadge}>
-            <Text style={styles.ratingText}>★ {Number(item.rating).toFixed(1)}</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={styles.posterTitle} numberOfLines={2}>
-        {item.name}
-      </Text>
-    </PressableScale>
-  );
-});
-
-export function CatalogScreen({mode, onBack, onSelect}: Props) {
+export function CatalogScreen({mode, onSelect}: Props) {
   const slice = useCatalogStore(s => (mode === 'vod' ? s.vod : s.series));
   const loadVod = useCatalogStore(s => s.loadVod);
   const loadSeries = useCatalogStore(s => s.loadSeries);
@@ -99,10 +66,9 @@ export function CatalogScreen({mode, onBack, onSelect}: Props) {
   }, [items, category, debounced]);
 
   const itemWidth = Math.floor((width - PAD * 2 - GAP * (COLS - 1)) / COLS);
-  const title = mode === 'vod' ? 'VOD' : 'SERİES';
 
   const renderItem = useCallback(
-    ({item}: {item: Item}) => <Poster item={item} width={itemWidth} onPress={onSelect} />,
+    ({item}: {item: Item}) => <PosterCard item={item} width={itemWidth} onPress={onSelect} />,
     [itemWidth, onSelect],
   );
 
@@ -126,15 +92,7 @@ export function CatalogScreen({mode, onBack, onSelect}: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.root}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} hitSlop={10} style={styles.backBtn}>
-          <Text style={styles.backText}>‹ Menü</Text>
-        </Pressable>
-        <Text style={styles.title}>{title}</Text>
-        <View style={{width: 64}} />
-      </View>
-
+    <SafeAreaView style={styles.root} edges={[]}>
       <View style={styles.searchWrap}>
         <TextInput
           value={query}
@@ -210,8 +168,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surfaceAlt,
   },
-  backText: {color: colors.text, fontSize: 13, fontWeight: '600'},
-  title: {color: colors.gold, fontSize: 17, fontWeight: '800', letterSpacing: 4},
+  backText: {color: colors.text, fontSize: 13, fontFamily: fonts.semi},
+  title: {color: colors.gold, fontSize: 17, fontFamily: fonts.xbold, letterSpacing: 4},
   searchWrap: {paddingHorizontal: PAD, paddingTop: 6, paddingBottom: 8},
   search: {
     height: 42,
@@ -233,8 +191,8 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   chipActive: {backgroundColor: colors.accent},
-  chipText: {color: colors.textDim, fontSize: 13, fontWeight: '600'},
-  chipTextActive: {color: '#fff'},
+  chipText: {color: colors.textDim, fontSize: 13, fontFamily: fonts.semi},
+  chipTextActive: {color: colors.onAccent},
   poster: {
     borderRadius: 12,
     overflow: 'hidden',
@@ -244,8 +202,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  posterFallback: {color: colors.accent, fontSize: 34, fontWeight: '800'},
-  posterTitle: {color: colors.text, fontSize: 12, fontWeight: '600', marginTop: 6, lineHeight: 16},
+  posterFallback: {color: colors.accent, fontSize: 34, fontFamily: fonts.xbold},
+  posterTitle: {color: colors.text, fontSize: 12, fontFamily: fonts.semi, marginTop: 6, lineHeight: 16},
   ratingBadge: {
     position: 'absolute',
     top: 6,
@@ -255,10 +213,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  ratingText: {color: colors.gold, fontSize: 10, fontWeight: '700'},
+  ratingText: {color: colors.gold, fontSize: 10, fontFamily: fonts.bold},
   emptyBox: {alignItems: 'center', paddingTop: 60, paddingHorizontal: 32, gap: 10},
   emptyText: {color: colors.textDim, fontSize: 14, textAlign: 'center', lineHeight: 20},
-  errorTitle: {color: colors.text, fontSize: 16, fontWeight: '700'},
+  errorTitle: {color: colors.text, fontSize: 16, fontFamily: fonts.bold},
   retryBtn: {
     marginTop: 6,
     backgroundColor: colors.accent,
@@ -266,5 +224,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
-  retryText: {color: '#fff', fontWeight: '700', fontSize: 14},
+  retryText: {color: colors.onAccent, fontFamily: fonts.bold, fontSize: 14},
 });

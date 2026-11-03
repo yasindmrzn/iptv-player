@@ -1,7 +1,7 @@
 import React, {memo, useCallback} from 'react';
 import {FlatList, Pressable, StyleSheet, Text} from 'react-native';
 
-import {colors} from '../theme';
+import {colors, fonts} from '../theme';
 
 export const CAT_ALL = '__all__';
 export const CAT_FAV = '__fav__';
@@ -70,6 +70,6 @@ const styles = StyleSheet.create({
     maxWidth: 220,
   },
   chipActive: {backgroundColor: colors.accent},
-  chipText: {color: colors.textDim, fontSize: 13, fontWeight: '600'},
+  chipText: {color: colors.textDim, fontSize: 13, fontFamily: fonts.semi},
   chipTextActive: {color: '#fff'},
 });

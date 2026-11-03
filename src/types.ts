@@ -74,3 +74,20 @@ export type StreamKind =
   | 'unknown';
 
 export type PlayerEngine = 'native' | 'vlc';
+
+export type VodDetails = {
+  plot?: string;
+  genre?: string;
+  year?: string;
+  duration?: string;
+  rating?: string;
+  cast?: string;
+  director?: string;
+  /** YouTube video kimliği ya da tam bağlantı */
+  trailer?: string;
+  backdrop?: string;
+};
+
+export type RecentItem =
+  | {kind: 'vod'; item: VodItem; ts: number}
+  | {kind: 'series'; item: SeriesItem; ts: number};

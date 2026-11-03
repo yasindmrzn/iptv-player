@@ -10,13 +10,15 @@ import {
   xtreamAuthenticate,
   type XtreamAccountInfo,
 } from '../services/xtream';
-import type {Channel, EpgMap, XtreamCredentials} from '../types';
+import type {Channel, EpgMap, RecentItem, XtreamCredentials} from '../types';
 
 type State = {
   // ── Kalıcı ──────────────────────────────────────────────
   account: XtreamCredentials | null;
   favorites: Record<string, true>;
   lastChannelId: string | null;
+  /** Son izlenen film/diziler (en yeni başta, en çok 12) */
+  recent: RecentItem[];
 
   // ── Oturum (kalıcı değil) ───────────────────────────────
   accountInfo: XtreamAccountInfo | null;
@@ -37,6 +39,7 @@ type State = {
   loadLive: (force?: boolean) => Promise<void>;
   selectChannel: (c: Channel) => void;
   toggleFavorite: (id: string) => void;
+  addRecent: (r: RecentItem) => void;
   loadChannelEpg: (c: Channel) => Promise<void>;
 };
 
@@ -48,6 +51,7 @@ export const useIptvStore = create<State>()(
       account: null,
       favorites: {},
       lastChannelId: null,
+      recent: [],
 
       accountInfo: null,
       channels: [],
@@ -87,6 +91,7 @@ export const useIptvStore = create<State>()(
           epg: {},
           currentChannel: null,
           lastChannelId: null,
+          recent: [],
           error: null,
           loading: false,
         });
@@ -151,6 +156,14 @@ export const useIptvStore = create<State>()(
           return {favorites: next};
         }),
 
+      addRecent: r =>
+        set(state => ({
+          recent: [
+            r,
+            ...state.recent.filter(x => !(x.kind === r.kind && x.item.id === r.item.id)),
+          ].slice(0, 12),
+        })),
+
       loadChannelEpg: async c => {
         const {account, epg} = get();
         if (!account) {
@@ -180,6 +193,7 @@ export const useIptvStore = create<State>()(
         account: s.account,
         favorites: s.favorites,
         lastChannelId: s.lastChannelId,
+        recent: s.recent,
       }),
       onRehydrateStorage: () => () => {
         useIptvStore.setState({hydrated: true});

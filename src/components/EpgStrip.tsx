@@ -2,7 +2,7 @@ import React, {memo} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 
 import {formatClock} from '../services/epg';
-import {colors} from '../theme';
+import {colors, fonts} from '../theme';
 import type {Channel, Programme} from '../types';
 
 type Props = {
@@ -69,9 +69,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  channel: {color: colors.textDim, fontSize: 12, fontWeight: '600', marginBottom: 4},
+  channel: {color: colors.textDim, fontSize: 12, fontFamily: fonts.semi, marginBottom: 4},
   rowBetween: {flexDirection: 'row', justifyContent: 'space-between', gap: 10},
-  nowTitle: {flex: 1, color: colors.text, fontSize: 15, fontWeight: '700'},
+  nowTitle: {flex: 1, color: colors.text, fontSize: 15, fontFamily: fonts.bold},
   time: {color: colors.textDim, fontSize: 12, fontVariant: ['tabular-nums']},
   track: {
     height: 3,
