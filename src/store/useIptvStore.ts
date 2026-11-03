@@ -2,23 +2,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {create} from 'zustand';
 import {createJSONStorage, persist} from 'zustand/middleware';
 
-import {epgKey, fetchEpg} from '../services/epg';
-import {fetchM3U} from '../services/m3uParser';
+import {epgKey} from '../services/epg';
 import {
   fetchXtreamChannels,
   fetchXtreamShortEpg,
-  xtreamXmltvUrl,
+  normalizeServer,
+  xtreamAuthenticate,
+  type XtreamAccountInfo,
 } from '../services/xtream';
-import type {Channel, EpgMap, Source} from '../types';
+import type {Channel, EpgMap, XtreamCredentials} from '../types';
 
 type State = {
   // ── Kalıcı ──────────────────────────────────────────────
-  sources: Source[];
-  activeSourceId: string | null;
+  account: XtreamCredentials | null;
   favorites: Record<string, true>;
   lastChannelId: string | null;
 
   // ── Oturum (kalıcı değil) ───────────────────────────────
+  accountInfo: XtreamAccountInfo | null;
   channels: Channel[];
   groups: string[];
   epg: EpgMap;
@@ -28,25 +29,27 @@ type State = {
   hydrated: boolean;
 
   // ── Eylemler ────────────────────────────────────────────
-  addSource: (s: Source) => Promise<void>;
-  removeSource: (id: string) => Promise<void>;
-  setActiveSource: (id: string) => Promise<void>;
-  loadActiveSource: () => Promise<void>;
+  /** Doğrular ve kaydeder; hatalı girişte Error fırlatır. */
+  login: (creds: XtreamCredentials) => Promise<void>;
+  logout: () => void;
+  /** Kayıtlı hesabın bilgilerini (bitiş tarihi vb.) sessizce yeniler. */
+  refreshAccount: () => Promise<void>;
+  loadLive: (force?: boolean) => Promise<void>;
   selectChannel: (c: Channel) => void;
   toggleFavorite: (id: string) => void;
   loadChannelEpg: (c: Channel) => Promise<void>;
 };
 
-let loadToken = 0;
+let liveToken = 0;
 
 export const useIptvStore = create<State>()(
   persist(
     (set, get) => ({
-      sources: [],
-      activeSourceId: null,
+      account: null,
       favorites: {},
       lastChannelId: null,
 
+      accountInfo: null,
       channels: [],
       groups: [],
       epg: {},
@@ -55,96 +58,79 @@ export const useIptvStore = create<State>()(
       error: null,
       hydrated: false,
 
-      addSource: async s => {
-        set(state => ({
-          sources: [...state.sources.filter(x => x.id !== s.id), s],
-          activeSourceId: s.id,
-        }));
-        await get().loadActiveSource();
+      login: async creds => {
+        const clean: XtreamCredentials = {
+          server: normalizeServer(creds.server),
+          username: creds.username.trim(),
+          password: creds.password,
+        };
+        const info = await xtreamAuthenticate(clean);
+        liveToken++; // süren eski yüklemeleri geçersiz kıl
+        set({
+          account: clean,
+          accountInfo: info,
+          channels: [],
+          groups: [],
+          epg: {},
+          currentChannel: null,
+          error: null,
+        });
       },
 
-      removeSource: async id => {
-        const {sources, activeSourceId} = get();
-        const rest = sources.filter(s => s.id !== id);
-        const nextActive =
-          activeSourceId === id ? rest[0]?.id ?? null : activeSourceId;
-        set({sources: rest, activeSourceId: nextActive});
-        if (activeSourceId === id) {
-          set({channels: [], groups: [], epg: {}, currentChannel: null});
-          if (nextActive) {
-            await get().loadActiveSource();
-          }
-        }
+      logout: () => {
+        liveToken++;
+        set({
+          account: null,
+          accountInfo: null,
+          channels: [],
+          groups: [],
+          epg: {},
+          currentChannel: null,
+          lastChannelId: null,
+          error: null,
+          loading: false,
+        });
       },
 
-      setActiveSource: async id => {
-        set({activeSourceId: id});
-        await get().loadActiveSource();
-      },
-
-      loadActiveSource: async () => {
-        const {sources, activeSourceId, lastChannelId} = get();
-        const src = sources.find(s => s.id === activeSourceId);
-        if (!src) {
-          set({channels: [], groups: [], currentChannel: null, loading: false});
+      refreshAccount: async () => {
+        const {account} = get();
+        if (!account) {
           return;
         }
-
-        const token = ++loadToken;
-        set({loading: true, error: null, epg: {}});
-
         try {
-          let channels: Channel[];
-          let groups: string[];
-          let epgUrl: string | undefined;
+          const info = await xtreamAuthenticate(account);
+          set({accountInfo: info});
+        } catch {
+          /* çevrimdışı olabilir; mevcut bilgiyle devam */
+        }
+      },
 
-          if (src.kind === 'm3u') {
-            const parsed = await fetchM3U(src.url);
-            channels = parsed.channels;
-            groups = parsed.groups;
-            epgUrl = src.epgUrl || parsed.epgUrls[0];
-          } else {
-            const res = await fetchXtreamChannels(src.creds);
-            channels = res.channels;
-            groups = res.groups;
-            // Xtream'de kanal başına short-EPG kullanılır (loadChannelEpg);
-            // tam XMLTV yalnızca elle istenirse indirilir.
-            epgUrl = undefined;
+      loadLive: async (force = false) => {
+        const {account, channels, lastChannelId} = get();
+        if (!account || (!force && channels.length > 0)) {
+          return;
+        }
+        const token = ++liveToken;
+        set({loading: true, error: null});
+        try {
+          const res = await fetchXtreamChannels(account);
+          if (token !== liveToken) {
+            return;
           }
-
-          if (token !== loadToken) {
-            return; // daha yeni bir yükleme başladı
-          }
-
-          const last = channels.find(c => c.id === lastChannelId) ?? null;
           set({
-            channels,
-            groups,
+            channels: res.channels,
+            groups: res.groups,
             loading: false,
-            currentChannel: last,
+            currentChannel:
+              res.channels.find(c => c.id === lastChannelId) ?? get().currentChannel,
           });
-
-          if (epgUrl) {
-            // Arka planda; arayüzü bekletmez
-            const wanted = new Set<string>();
-            channels.forEach(c => c.tvgId && wanted.add(epgKey(c.tvgId)));
-            fetchEpg(epgUrl, wanted.size ? wanted : undefined)
-              .then(epg => {
-                if (token === loadToken) {
-                  set({epg});
-                }
-              })
-              .catch(() => {
-                /* EPG olmadan da çalışır */
-              });
-          }
         } catch (e) {
-          if (token !== loadToken) {
+          if (token !== liveToken) {
             return;
           }
           set({
             loading: false,
-            error: e instanceof Error ? e.message : 'Liste yüklenemedi.',
+            error: e instanceof Error ? e.message : 'Kanallar yüklenemedi.',
           });
         }
       },
@@ -166,9 +152,8 @@ export const useIptvStore = create<State>()(
         }),
 
       loadChannelEpg: async c => {
-        const {sources, activeSourceId, epg} = get();
-        const src = sources.find(s => s.id === activeSourceId);
-        if (!src || src.kind !== 'xtream') {
+        const {account, epg} = get();
+        if (!account) {
           return;
         }
         const key = epgKey(c.epgChannelId ?? c.id);
@@ -177,13 +162,10 @@ export const useIptvStore = create<State>()(
           return;
         }
         try {
-          const list = await fetchXtreamShortEpg(src.creds, c, 6);
+          const list = await fetchXtreamShortEpg(account, c, 6);
           if (list.length) {
             set(state => ({
-              epg: {
-                ...state.epg,
-                [key]: list.map(p => ({...p, channelId: key})),
-              },
+              epg: {...state.epg, [key]: list.map(p => ({...p, channelId: key}))},
             }));
           }
         } catch {
@@ -192,11 +174,10 @@ export const useIptvStore = create<State>()(
       },
     }),
     {
-      name: 'iptv-player-v1',
+      name: 'pashaplay-v1',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: s => ({
-        sources: s.sources,
-        activeSourceId: s.activeSourceId,
+        account: s.account,
         favorites: s.favorites,
         lastChannelId: s.lastChannelId,
       }),
@@ -206,26 +187,3 @@ export const useIptvStore = create<State>()(
     },
   ),
 );
-
-/** Tam XMLTV'yi (Xtream dahil) elle yüklemek için yardımcı. */
-export async function loadFullXmltvForActiveSource(): Promise<void> {
-  const {sources, activeSourceId, channels} = useIptvStore.getState();
-  const src = sources.find(s => s.id === activeSourceId);
-  if (!src) {
-    return;
-  }
-  const url =
-    src.kind === 'xtream' ? xtreamXmltvUrl(src.creds) : src.epgUrl ?? undefined;
-  if (!url) {
-    return;
-  }
-  const wanted = new Set<string>();
-  channels.forEach(c => {
-    const id = c.tvgId ?? c.epgChannelId;
-    if (id) {
-      wanted.add(epgKey(id));
-    }
-  });
-  const epg = await fetchEpg(url, wanted.size ? wanted : undefined);
-  useIptvStore.setState({epg});
-}

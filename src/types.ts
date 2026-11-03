@@ -34,9 +34,34 @@ export type XtreamCredentials = {
   password: string;
 };
 
-export type Source =
-  | { id: string; kind: 'm3u'; name: string; url: string; epgUrl?: string }
-  | { id: string; kind: 'xtream'; name: string; creds: XtreamCredentials };
+export type VodItem = {
+  id: string;
+  name: string;
+  cover?: string;
+  categoryId: string;
+  rating?: string;
+  ext: string;
+};
+
+export type SeriesItem = {
+  id: string;
+  name: string;
+  cover?: string;
+  categoryId: string;
+  plot?: string;
+  rating?: string;
+};
+
+export type Episode = {
+  id: string;
+  season: number;
+  number: number;
+  title: string;
+  ext: string;
+  duration?: string;
+};
+
+export type Category = {id: string; name: string};
 
 export type StreamKind =
   | 'hls'
@@ -45,6 +70,7 @@ export type StreamKind =
   | 'rtmp'
   | 'rtsp'
   | 'progressive'
+  | 'file'
   | 'unknown';
 
 export type PlayerEngine = 'native' | 'vlc';

@@ -1,4 +1,12 @@
-import type {Channel, Programme, XtreamCredentials} from '../types';
+import type {
+  Category,
+  Channel,
+  Episode,
+  Programme,
+  SeriesItem,
+  VodItem,
+  XtreamCredentials,
+} from '../types';
 import {fetchWithTimeout} from '../utils/net';
 import {base64ToUtf8} from '../utils/text';
 
@@ -167,4 +175,126 @@ export function xtreamXmltvUrl(creds: XtreamCredentials): string {
     `?username=${encodeURIComponent(creds.username)}` +
     `&password=${encodeURIComponent(creds.password)}`
   );
+}
+
+// ───────────────────────── VOD (filmler) ─────────────────────────
+
+type RawCat = {category_id: string | number; category_name: string};
+
+const toCats = (raw: unknown): Category[] =>
+  (Array.isArray(raw) ? (raw as RawCat[]) : []).map(c => ({
+    id: String(c.category_id),
+    name: c.category_name,
+  }));
+
+export async function fetchVodCategories(c: XtreamCredentials): Promise<Category[]> {
+  return toCats(await getJson<unknown>(apiUrl(c, 'get_vod_categories')));
+}
+
+export async function fetchVodItems(c: XtreamCredentials): Promise<VodItem[]> {
+  const raw = await getJson<
+    Array<{
+      stream_id: number | string;
+      name: string;
+      stream_icon?: string | null;
+      rating?: string | number | null;
+      category_id?: string | number | null;
+      container_extension?: string | null;
+    }>
+  >(apiUrl(c, 'get_vod_streams'), 90000);
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.map(v => ({
+    id: String(v.stream_id),
+    name: v.name,
+    cover: v.stream_icon || undefined,
+    categoryId: String(v.category_id ?? ''),
+    rating: v.rating != null && v.rating !== '' ? String(v.rating) : undefined,
+    ext: v.container_extension || 'mp4',
+  }));
+}
+
+export function vodUrl(c: XtreamCredentials, v: VodItem): string {
+  return `${normalizeServer(c.server)}/movie/${encodeURIComponent(
+    c.username,
+  )}/${encodeURIComponent(c.password)}/${v.id}.${v.ext}`;
+}
+
+// ───────────────────────── Diziler ─────────────────────────
+
+export async function fetchSeriesCategories(c: XtreamCredentials): Promise<Category[]> {
+  return toCats(await getJson<unknown>(apiUrl(c, 'get_series_categories')));
+}
+
+export async function fetchSeriesItems(c: XtreamCredentials): Promise<SeriesItem[]> {
+  const raw = await getJson<
+    Array<{
+      series_id: number | string;
+      name: string;
+      cover?: string | null;
+      plot?: string | null;
+      rating?: string | number | null;
+      category_id?: string | number | null;
+    }>
+  >(apiUrl(c, 'get_series'), 90000);
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.map(s => ({
+    id: String(s.series_id),
+    name: s.name,
+    cover: s.cover || undefined,
+    plot: s.plot || undefined,
+    categoryId: String(s.category_id ?? ''),
+    rating: s.rating != null && s.rating !== '' ? String(s.rating) : undefined,
+  }));
+}
+
+type RawEpisode = {
+  id: string | number;
+  episode_num?: string | number;
+  title?: string;
+  season?: string | number;
+  container_extension?: string;
+  info?: {duration?: string};
+};
+
+/** Dizinin bölümleri. Sunucular `episodes`'u sezon→liste nesnesi ya da düz liste olarak döndürür. */
+export async function fetchSeriesEpisodes(
+  c: XtreamCredentials,
+  seriesId: string,
+): Promise<Episode[]> {
+  const data = await getJson<{episodes?: Record<string, RawEpisode[]> | RawEpisode[]}>(
+    apiUrl(c, 'get_series_info', `&series_id=${encodeURIComponent(seriesId)}`),
+    40000,
+  );
+
+  const out: Episode[] = [];
+  const push = (e: RawEpisode, fallbackSeason: number) => {
+    out.push({
+      id: String(e.id),
+      season: Number(e.season ?? fallbackSeason) || fallbackSeason,
+      number: Number(e.episode_num) || out.length + 1,
+      title: e.title || `Bölüm ${e.episode_num ?? out.length + 1}`,
+      ext: e.container_extension || 'mp4',
+      duration: e.info?.duration,
+    });
+  };
+
+  const eps = data.episodes;
+  if (Array.isArray(eps)) {
+    eps.forEach(e => push(e, 1));
+  } else if (eps && typeof eps === 'object') {
+    Object.entries(eps).forEach(([season, list]) =>
+      (Array.isArray(list) ? list : []).forEach(e => push(e, Number(season) || 1)),
+    );
+  }
+  return out.sort((a, b) => a.season - b.season || a.number - b.number);
+}
+
+export function episodeUrl(c: XtreamCredentials, e: Episode): string {
+  return `${normalizeServer(c.server)}/series/${encodeURIComponent(
+    c.username,
+  )}/${encodeURIComponent(c.password)}/${e.id}.${e.ext}`;
 }

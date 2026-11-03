@@ -18,9 +18,16 @@ import {
   nativeSourceType,
 } from '../src/services/streamType';
 import {
+  episodeUrl,
+  fetchSeriesCategories,
+  fetchSeriesEpisodes,
+  fetchSeriesItems,
+  fetchVodCategories,
+  fetchVodItems,
   fetchXtreamChannels,
   fetchXtreamShortEpg,
   normalizeServer,
+  vodUrl,
   xtreamAuthenticate,
   xtreamLiveUrl,
 } from '../src/services/xtream';
@@ -240,6 +247,27 @@ async function main() {
           {stream_id: 102, name: 'Spor TV', category_id: '2', epg_channel_id: ''},
           {stream_id: 103, name: 'Bilinmeyen', category_id: '999'},
         ]);
+      } else if (action === 'get_vod_categories') {
+        json([{category_id: '10', category_name: 'Aksiyon'}]);
+      } else if (action === 'get_vod_streams') {
+        json([
+          {stream_id: 501, name: 'Film A', stream_icon: 'http://x/a.jpg', rating: '7.5', category_id: '10', container_extension: 'mkv'},
+          {stream_id: 502, name: 'Film B', rating: '', category_id: 10},
+        ]);
+      } else if (action === 'get_series_categories') {
+        json([{category_id: '20', category_name: 'Drama'}]);
+      } else if (action === 'get_series') {
+        json([{series_id: 7, name: 'Dizi X', cover: 'http://x/c.jpg', plot: 'Özet', rating: 8, category_id: '20'}]);
+      } else if (action === 'get_series_info') {
+        json({
+          episodes: {
+            '2': [{id: '902', episode_num: 1, title: 'S2 B1', season: 2, container_extension: 'mp4'}],
+            '1': [
+              {id: '901', episode_num: 2, title: 'Final', season: 1, container_extension: 'mkv', info: {duration: '45:00'}},
+              {id: '900', episode_num: 1, title: 'Pilot', season: 1, container_extension: 'mkv'},
+            ],
+          },
+        });
       } else if (action === 'get_short_epg') {
         json({
           epg_listings: [{
@@ -308,6 +336,32 @@ async function main() {
       const list = await fetchXtreamShortEpg(creds, ch, 4);
       eq([list[0].title, list[0].description], ['Ana Haber', 'Günün haberleri']);
       eq(list[0].stop > Date.now(), true);
+    });
+    await t('VOD: kategori, liste, varsayılan uzantı ve URL', async () => {
+      const cats = await fetchVodCategories(creds);
+      eq(cats, [{id: '10', name: 'Aksiyon'}]);
+      const items = await fetchVodItems(creds);
+      eq(items.map(v => [v.id, v.name, v.categoryId, v.rating, v.ext]), [
+        ['501', 'Film A', '10', '7.5', 'mkv'],
+        ['502', 'Film B', '10', undefined, 'mp4'],
+      ]);
+      eq(vodUrl(creds, items[0]), `${base}/movie/u/p%20w%26d/501.mkv`);
+    });
+    await t('Diziler: liste + sezon/bölüm sıralaması + URL', async () => {
+      eq(await fetchSeriesCategories(creds), [{id: '20', name: 'Drama'}]);
+      const list = await fetchSeriesItems(creds);
+      eq([list[0].id, list[0].rating, list[0].plot], ['7', '8', 'Özet']);
+      const eps = await fetchSeriesEpisodes(creds, '7');
+      eq(eps.map(e => [e.season, e.number, e.title]), [
+        [1, 1, 'Pilot'],
+        [1, 2, 'Final'],
+        [2, 1, 'S2 B1'],
+      ]);
+      eq(episodeUrl(creds, eps[1]), `${base}/series/u/p%20w%26d/901.mkv`);
+    });
+    await t('akış türü: Xtream film/dizi dosyaları "file"', () => {
+      eq(detectStreamKind('http://s/movie/u/p/1.mkv'), 'file');
+      eq(chooseEngine('file', 'ios'), 'vlc');
     });
     await t('normalizeServer / xtreamLiveUrl', () => {
       eq(normalizeServer(' sunucu.com:8080/ '), 'http://sunucu.com:8080');

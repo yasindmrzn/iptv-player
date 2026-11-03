@@ -23,7 +23,10 @@ export function detectStreamKind(rawUrl: string): StreamKind {
   if (path.endsWith('.ts')) {
     return 'ts';
   }
-  if (/\.(mp4|m4v|mkv|webm|mov|avi|mp3|aac|m4a|ogg|flac)$/.test(path)) {
+  if (/\.(mkv|avi|flv|wmv)$/.test(path)) {
+    return 'file';
+  }
+  if (/\.(mp4|m4v|webm|mov|mp3|aac|m4a|ogg|flac)$/.test(path)) {
     return 'progressive';
   }
   return 'unknown';
@@ -44,6 +47,10 @@ export function nativeSourceType(kind: StreamKind): string | undefined {
   }
 }
 
+/** Tek seferlik dosya (film/bölüm): sonu normaldir, canlı yayın gibi yeniden bağlanılmaz. */
+export const isFileKind = (kind: StreamKind) =>
+  kind === 'progressive' || kind === 'file';
+
 /**
  * Hangi oynatıcı motoru ilk denenir?
  *
@@ -59,7 +66,7 @@ export function chooseEngine(
   if (kind === 'rtmp' || kind === 'rtsp') {
     return 'vlc';
   }
-  if (os === 'ios' && (kind === 'dash' || kind === 'ts')) {
+  if (os === 'ios' && (kind === 'dash' || kind === 'ts' || kind === 'file')) {
     return 'vlc';
   }
   return 'native';

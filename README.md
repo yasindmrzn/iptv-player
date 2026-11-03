@@ -1,6 +1,6 @@
 # IPTV Player (React Native 0.88 · dikey mod · OLED karanlık tema)
 
-M3U / M3U8 (link veya dosya) ve Xtream Codes destekli, EPG'li IPTV oynatıcı.
+Yalnızca Xtream Codes girişli, EPG'li IPTV oynatıcı. Açılışta menü: CANLI · VOD · SERİES.
 Android ve iOS klasörleri hazırdır; ek proje oluşturmanız gerekmez.
 Gerekli ayarlar uygulanmıştır: dikey kilit, `minSdkVersion 26`, http yayınlar için cleartext izni.
 
@@ -42,7 +42,7 @@ App.tsx
 src/
   services/   m3uParser · xtream · epg · streamType
   store/      useIptvStore (zustand + AsyncStorage)
-  components/ VideoPlayer · ChannelItem · CategoryTabs · EpgStrip · SourceModal
+  components/ VideoPlayer · ChannelItem · CategoryTabs · EpgStrip
   screens/    MainScreen
 scripts/test.ts   servis testleri
 ```
@@ -58,7 +58,7 @@ Native motor yayını açamazsa otomatik VLC'ye geçilir; ardından 3 kez artan 
 yeniden denenir. HEVC/VP9/AV1/AC3/EAC3/DTS desteği cihazın çözücülerine bağlıdır.
 
 ## EPG
-- M3U: `url-tvg` ya da kaynak eklerken girilen XMLTV adresi (`.gz` otomatik açılır).
+- Canlı yayın EPG: Xtream `get_short_epg` ile kanal başına yüklenir.
 - Xtream: kanal seçilince yalnızca o kanalın programı (`get_short_epg`) çekilir.
 
 ## Komutlar
@@ -69,6 +69,6 @@ npm run test:services  # 24 test: parser, EPG, Xtream (yerel sahte sunucu)
 
 ## Bilinen sınırlar
 - Uygulama gerçek cihazda/emülatörde henüz denenmedi; servisler test edildi, proje tip denetiminden geçti.
-  Oynatıcı davranışı, VLC seçenekleri ve dosya seçici cihazda doğrulanmalıdır.
+  Oynatıcı davranışı, VLC seçenekleri cihazda doğrulanmalıdır.
 - HDS (.f4m) desteklenmiyor.
 - Canlı yayın odaklı: VOD için sarma kontrolü yok. Yalnızca dikey mod.

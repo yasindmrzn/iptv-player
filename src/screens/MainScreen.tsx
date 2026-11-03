@@ -21,7 +21,6 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {CAT_ALL, CAT_FAV, CategoryTabs} from '../components/CategoryTabs';
 import {ChannelItem} from '../components/ChannelItem';
 import {EpgStrip} from '../components/EpgStrip';
-import {SourceModal} from '../components/SourceModal';
 import {VideoPlayer} from '../components/VideoPlayer';
 import {getNowNext} from '../services/epg';
 import {useIptvStore} from '../store/useIptvStore';
@@ -31,12 +30,10 @@ import type {Channel} from '../types';
 const SWIPE_THRESHOLD = 48;
 const epgIdOf = (c: Channel) => c.tvgId ?? c.epgChannelId ?? c.id;
 
-export function MainScreen({ready = true}: {ready?: boolean}) {
+export function MainScreen({onBack}: {onBack: () => void}) {
   const insets = useSafeAreaInsets();
 
   // ── Store ────────────────────────────────────────────────────────────────
-  const hydrated = useIptvStore(s => s.hydrated);
-  const sources = useIptvStore(s => s.sources);
   const channels = useIptvStore(s => s.channels);
   const groups = useIptvStore(s => s.groups);
   const epg = useIptvStore(s => s.epg);
@@ -46,33 +43,20 @@ export function MainScreen({ready = true}: {ready?: boolean}) {
   const error = useIptvStore(s => s.error);
   const selectChannel = useIptvStore(s => s.selectChannel);
   const toggleFavorite = useIptvStore(s => s.toggleFavorite);
-  const loadActiveSource = useIptvStore(s => s.loadActiveSource);
+  const loadLive = useIptvStore(s => s.loadLive);
 
   // ── Yerel durum ──────────────────────────────────────────────────────────
   const [category, setCategory] = useState(CAT_ALL);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [appActive, setAppActive] = useState(true);
   const listRef = useRef<FlatList<Channel>>(null);
-  const autoOpened = useRef(false);
 
-  // Açılışta (kalıcı veri yüklendikten sonra) aktif kaynağı yükle
+  // Ekran açılınca kanalları yükle (önbellekteyse atlar)
   useEffect(() => {
-    if (hydrated) {
-      void loadActiveSource();
-    }
-  }, [hydrated, loadActiveSource]);
-
-  // Hiç kaynak yoksa ekleme penceresini bir kez otomatik aç
-  useEffect(() => {
-    // Açılış ekranı bitmeden pencere açılmasın
-    if (ready && hydrated && sources.length === 0 && !autoOpened.current) {
-      autoOpened.current = true;
-      setModalOpen(true);
-    }
-  }, [ready, hydrated, sources.length]);
+    void loadLive();
+  }, [loadLive]);
 
   // EPG ilerleme çubukları için dakikada bir saat tikle
   useEffect(() => {
@@ -219,18 +203,8 @@ export function MainScreen({ready = true}: {ready?: boolean}) {
         <>
           <Text style={styles.errorTitle}>Liste yüklenemedi</Text>
           <Text style={styles.emptyText}>{error}</Text>
-          <Pressable style={styles.retryBtn} onPress={() => void loadActiveSource()}>
+          <Pressable style={styles.retryBtn} onPress={() => void loadLive(true)}>
             <Text style={styles.retryText}>Tekrar dene</Text>
-          </Pressable>
-        </>
-      ) : sources.length === 0 ? (
-        <>
-          <Text style={styles.errorTitle}>Henüz kaynak yok</Text>
-          <Text style={styles.emptyText}>
-            M3U bağlantısı, dosya veya Xtream Codes hesabı ekleyin.
-          </Text>
-          <Pressable style={styles.retryBtn} onPress={() => setModalOpen(true)}>
-            <Text style={styles.retryText}>Kaynak ekle</Text>
           </Pressable>
         </>
       ) : category === CAT_FAV && !favoriteCount ? (
@@ -247,10 +221,11 @@ export function MainScreen({ready = true}: {ready?: boolean}) {
     <SafeAreaView style={styles.root} edges={['top']}>
       {/* Üst başlık */}
       <View style={styles.header}>
-        <Text style={styles.brand}>PASHAPLAY</Text>
-        <Pressable onPress={() => setModalOpen(true)} hitSlop={10} style={styles.headerBtn}>
-          <Text style={styles.headerBtnText}>Kaynaklar</Text>
+        <Pressable onPress={onBack} hitSlop={10} style={styles.headerBtn}>
+          <Text style={styles.headerBtnText}>‹ Menü</Text>
         </Pressable>
+        <Text style={styles.brand}>CANLI</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Oynatıcı: 16:9, üstte sabit; dikey kaydırma = kanal değiştir */}
@@ -343,7 +318,6 @@ export function MainScreen({ready = true}: {ready?: boolean}) {
         </Pressable>
       </View>
 
-      <SourceModal visible={modalOpen} onClose={() => setModalOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -364,6 +338,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surfaceAlt,
   },
+  headerSpacer: {width: 64},
   headerBtnText: {color: colors.text, fontSize: 13, fontWeight: '600'},
   searchWrap: {paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8},
   search: {

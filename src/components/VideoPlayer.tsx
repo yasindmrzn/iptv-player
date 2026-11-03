@@ -20,6 +20,7 @@ import Video, {
   type OnBufferData,
   type OnVideoErrorData,
   type ReactVideoSource,
+  type VideoRef,
 } from 'react-native-video';
 import {VLCPlayer} from 'react-native-vlc-media-player';
 
@@ -28,6 +29,7 @@ import type {Channel, PlayerEngine} from '../types';
 import {
   chooseEngine,
   detectStreamKind,
+  isFileKind,
   nativeSourceType,
 } from '../services/streamType';
 
@@ -37,6 +39,8 @@ type Props = {
   channel: Channel | null;
   /** Dışarıdan duraklatma (ör. uygulama arka plana geçince) */
   paused?: boolean;
+  /** Film/bölüm modu: sarma çubuğu gösterilir, "CANLI" rozeti gizlenir */
+  vod?: boolean;
   onStatusChange?: (status: Status) => void;
 };
 
@@ -98,7 +102,12 @@ function buildVlcOptions(ch: Channel): string[] {
   return opts;
 }
 
-function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Props) {
+function VideoPlayerBase({
+  channel,
+  paused: externalPaused,
+  vod = false,
+  onStatusChange,
+}: Props) {
   const kind = useMemo(
     () => (channel ? detectStreamKind(channel.url) : 'unknown'),
     [channel],
@@ -131,6 +140,11 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
   const [controlsVisible, setControlsVisible] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [position, setPosition] = useState(0); // sn (yalnızca vod)
+  const [duration, setDuration] = useState(0); // sn (yalnızca vod)
+  const [vlcSeek, setVlcSeek] = useState<number | undefined>(undefined);
+  const [barWidth, setBarWidth] = useState(0);
+  const nativeRef = useRef<VideoRef>(null);
 
   const retryCount = useRef(0);
   const triedFallback = useRef(false);
@@ -165,6 +179,9 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
     setErrorText(null);
     setNotice(null);
     setUserPaused(false);
+    setPosition(0);
+    setDuration(0);
+    setVlcSeek(undefined);
     statusRef.current = 'loading';
     setStatus('loading');
     onStatusChange?.('loading');
@@ -228,9 +245,9 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
       if (statusRef.current !== 'playing' && statusRef.current !== 'error') {
         handleFailure('Yayın zamanında başlamadı.');
       }
-    }, START_TIMEOUT_MS);
+    }, vod ? START_TIMEOUT_MS * 2 : START_TIMEOUT_MS);
     return () => clearTimeout(t);
-  }, [channel, attempt, engine, handleFailure]);
+  }, [channel, attempt, engine, handleFailure, vod]);
 
   const markPlaying = useCallback(() => {
     retryCount.current = 0;
@@ -319,7 +336,7 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
   // Canlı yayının "bitmesi" kopma demektir → yeniden bağlan. Tek seferlik
   // dosyalarda (mp4/mkv vb.) bitiş normaldir, yeniden bağlanma döngüsüne girme.
   const onEnded = useCallback(() => {
-    if (kind !== 'progressive') {
+    if (!isFileKind(kind)) {
       handleFailure('Yayın sona erdi.');
     }
   }, [kind, handleFailure]);
@@ -337,6 +354,17 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
     [handleFailure],
   );
 
+  const seekTo = (sec: number) => {
+    const t = Math.max(0, duration > 0 ? Math.min(duration - 1, sec) : sec);
+    setPosition(t);
+    if (engineRef.current === 'native') {
+      nativeRef.current?.seek(t);
+    } else if (duration > 0) {
+      setVlcSeek(t / duration);
+    }
+    showControls();
+  };
+
   // ── Görünüm ────────────────────────────────────────────────────────────
   if (!channel) {
     return (
@@ -353,6 +381,7 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
     <View style={styles.container}>
       {engine === 'native' ? (
         <Video
+          ref={nativeRef}
           key={`n-${channel.id}-${attempt}`}
           style={StyleSheet.absoluteFill}
           source={nativeSource}
@@ -364,13 +393,21 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
           playInBackground={false}
           playWhenInactive={false}
           preventsDisplaySleepDuringVideoPlayback
-          progressUpdateInterval={2000}
+          progressUpdateInterval={vod ? 500 : 2000}
           automaticallyWaitsToMinimizeStalling
           preferredForwardBufferDuration={10}
           onLoadStart={() => updateStatus('loading')}
           onReadyForDisplay={markPlaying}
           onBuffer={onNativeBuffer}
-          onProgress={() => {
+          onLoad={d => {
+            if (vod) {
+              setDuration(d.duration);
+            }
+          }}
+          onProgress={p => {
+            if (vod) {
+              setPosition(p.currentTime);
+            }
             if (statusRef.current !== 'playing' && !paused) {
               markPlaying();
             }
@@ -388,13 +425,20 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
           resizeMode={fill ? 'cover' : 'contain'}
           autoplay
           autoAspectRatio
+          seek={vlcSeek}
           onBuffering={() => {
             if (statusRef.current !== 'playing') {
               updateStatus('buffering');
             }
           }}
           onPlaying={markPlaying}
-          onProgress={() => {
+          onProgress={e => {
+            if (vod) {
+              // Kütüphane süreyi sürüme göre sn ya da ms verebilir: büyük değer ms sayılır
+              const dur = e.duration > 100000 ? e.duration / 1000 : e.duration;
+              setDuration(dur);
+              setPosition(e.position * dur);
+            }
             if (statusRef.current !== 'playing' && !paused) {
               markPlaying();
             }
@@ -437,10 +481,14 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
 
       {/* Üst rozetler */}
       <View pointerEvents="none" style={styles.topBar}>
-        <View style={styles.liveBadge}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>CANLI</Text>
-        </View>
+        {vod ? (
+          <View />
+        ) : (
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>CANLI</Text>
+          </View>
+        )}
         {controlsVisible && (
           <View style={styles.engineBadge}>
             <Text style={styles.engineText}>
@@ -456,7 +504,31 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
           <Text style={styles.channelName} numberOfLines={1}>
             {channel.name}
           </Text>
+          {vod && (
+            <View style={styles.seekRow}>
+              <Text style={styles.timeText}>{formatTime(position)}</Text>
+              <Pressable
+                style={styles.seekTrack}
+                onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
+                onPress={e => {
+                  if (barWidth > 0 && duration > 0) {
+                    seekTo((e.nativeEvent.locationX / barWidth) * duration);
+                  }
+                }}>
+                <View style={styles.seekBg}>
+                  <View
+                    style={[
+                      styles.seekFill,
+                      {width: `${duration > 0 ? Math.min(100, (position / duration) * 100) : 0}%`},
+                    ]}
+                  />
+                </View>
+              </Pressable>
+              <Text style={styles.timeText}>{formatTime(duration)}</Text>
+            </View>
+          )}
           <View style={styles.row}>
+            {vod && <CtrlButton label="−10 sn" wide onPress={() => seekTo(position - 10)} />}
             <CtrlButton
               label={paused ? '▶' : '❚❚'}
               onPress={() => {
@@ -464,6 +536,7 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
                 showControls();
               }}
             />
+            {vod && <CtrlButton label="+10 sn" wide onPress={() => seekTo(position + 10)} />}
             <CtrlButton
               label={muted ? '🔇' : '🔊'}
               onPress={() => {
@@ -489,6 +562,17 @@ function VideoPlayerBase({channel, paused: externalPaused, onStatusChange}: Prop
       )}
     </View>
   );
+}
+
+function formatTime(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 0) {
+    return '0:00';
+  }
+  const t = Math.floor(sec);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const ss = String(t % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
 function CtrlButton({
@@ -604,4 +688,24 @@ const styles = StyleSheet.create({
   ctrlWide: {paddingHorizontal: 14},
   ctrlPressed: {backgroundColor: 'rgba(139,92,246,0.55)'},
   ctrlText: {color: '#fff', fontSize: 13, fontWeight: '600'},
+  seekRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  seekTrack: {
+    flex: 1,
+    height: 22,
+    justifyContent: 'center',
+  },
+  seekBg: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    overflow: 'hidden',
+  },
+  seekFill: {height: 4, backgroundColor: colors.gold},
+  timeText: {
+    color: '#e8e0f8',
+    fontSize: 11,
+    minWidth: 38,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
 });
