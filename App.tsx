@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {Alert, AppState, BackHandler, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
+import {ContactSheet} from './src/components/ContactSheet';
 import {DetailSheet} from './src/components/DetailSheet';
 import {FadeIn} from './src/components/FadeIn';
 import {SplashScreen} from './src/components/SplashScreen';
@@ -45,6 +46,7 @@ export default function App() {
   const [tab, setTab] = useState<TabKey>('home');
   const [overlays, setOverlays] = useState<Overlay[]>([]);
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [contactOpen, setContactOpen] = useState(false);
   const overlay = overlays[overlays.length - 1];
 
   const pushOverlay = useCallback((o: Overlay) => setOverlays(s => [...s, o]), []);
@@ -202,9 +204,14 @@ export default function App() {
               <Text style={styles.logo}>PASHAPLAY</Text>
               {expiry ? <Text style={styles.expiry}>Bitiş · {expiry}</Text> : null}
             </View>
-            <Pressable onPress={confirmLogout} hitSlop={10} style={styles.logout}>
-              <Text style={styles.logoutText}>Çıkış</Text>
-            </Pressable>
+            <View style={styles.headerBtns}>
+              <Pressable onPress={() => setContactOpen(true)} hitSlop={10} style={styles.logout}>
+                <Text style={styles.contactText}>İletişim</Text>
+              </Pressable>
+              <Pressable onPress={confirmLogout} hitSlop={10} style={styles.logout}>
+                <Text style={styles.logoutText}>Çıkış</Text>
+              </Pressable>
+            </View>
           </View>
           <TopTabs active={tab} onChange={setTab} />
           <FadeIn key={tab} style={styles.body}>
@@ -220,6 +227,7 @@ export default function App() {
             )}
             {tab === 'favorites' && <FavoritesScreen onOpenChannel={openChannel} />}
           </FadeIn>
+          <ContactSheet visible={contactOpen} onClose={() => setContactOpen(false)} />
           <DetailSheet
             visible={!!detail}
             kind={detail?.kind ?? 'vod'}
@@ -269,6 +277,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassBorder,
   },
+  headerBtns: {flexDirection: 'row', gap: 8},
+  contactText: {color: colors.gold, fontSize: 12, fontFamily: fonts.semi},
   logoutText: {color: colors.text, fontSize: 12, fontFamily: fonts.semi},
   body: {flex: 1},
 });

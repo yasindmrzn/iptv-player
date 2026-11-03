@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
+import {ContactLinks} from '../components/ContactSheet';
 import {FadeIn} from '../components/FadeIn';
 import {PressableScale} from '../components/PressableScale';
 import {useIptvStore} from '../store/useIptvStore';
@@ -109,6 +110,7 @@ export function LoginScreen() {
               )}
             </PressableScale>
           </FadeIn>
+          <ContactLinks />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
