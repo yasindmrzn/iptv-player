@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -52,3 +55,21 @@ jobs:
           name: iptv-player-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+      - name: APK'yı doğrula (imza ve minimum Android sürümü)
+        run: |
+          BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          ls -la "$APK"
+          "$ANDROID_HOME/build-tools/$BT/apksigner" verify --verbose --print-certs "$APK" | head -12
+          "$ANDROID_HOME/build-tools/$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdkVersion|native-code"
+
+      - name: GitHub Release olarak yayınla (zip'siz doğrudan indirme)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk iptv-player.apk
+          gh release create "build-${{ github.run_number }}" iptv-player.apk \
+            --title "Derleme #${{ github.run_number }}" \
+            --notes "Telefona doğrudan kurulabilir APK (zip değildir)." \
+            --prerelease
