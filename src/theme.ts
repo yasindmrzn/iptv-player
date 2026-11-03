@@ -1,17 +1,18 @@
-/** OLED siyah ağırlıklı koyu tema */
+/** PashaPlay: koyu mor + altın vurgulu "lüks" tema */
 export const colors = {
-  bg: '#000000',
-  surface: '#0c0c0e',
-  surfaceAlt: '#16161a',
-  border: '#232328',
-  text: '#f2f2f4',
-  textDim: '#9a9aa2',
-  textFaint: '#63636b',
-  accent: '#2f81f7',
-  accentSoft: 'rgba(47,129,247,0.16)',
+  bg: '#070310',
+  surface: '#100822',
+  surfaceAlt: '#1a0f33',
+  border: '#2c1b52',
+  text: '#f6f1ff',
+  textDim: '#a99bc8',
+  textFaint: '#6b5d8c',
+  accent: '#8b5cf6',
+  accentSoft: 'rgba(139,92,246,0.18)',
+  gold: '#e6c36a',
   live: '#ff3b30',
-  fav: '#ffc83d',
-  danger: '#ff6b6b',
+  fav: '#e6c36a',
+  danger: '#ff6b81',
 };
 
 export const ROW_HEIGHT = 64;

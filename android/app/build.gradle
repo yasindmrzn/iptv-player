@@ -85,6 +85,16 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    // Her işlemci mimarisi için ayrı, küçük APK (universal APK üretilmez).
+    // arm64-v8a: günümüz telefonlarının neredeyse tamamı; armeabi-v7a: eski telefon / TV kutusu.
+    splits {
+        abi {
+            reset()
+            enable true
+            universalApk false
+            include "arm64-v8a", "armeabi-v7a"
+        }
+    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

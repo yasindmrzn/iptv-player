@@ -23,6 +23,7 @@ import Video, {
 } from 'react-native-video';
 import {VLCPlayer} from 'react-native-vlc-media-player';
 
+import {colors} from '../theme';
 import type {Channel, PlayerEngine} from '../types';
 import {
   chooseEngine,
@@ -526,7 +527,7 @@ const styles = StyleSheet.create({
   center: {alignItems: 'center', justifyContent: 'center'},
   row: {flexDirection: 'row', alignItems: 'center', gap: 8},
   emptyTitle: {color: '#fff', fontSize: 16, fontWeight: '600'},
-  emptySub: {color: '#8a8a8e', fontSize: 13, marginTop: 4},
+  emptySub: {color: colors.textDim, fontSize: 13, marginTop: 4},
   notice: {color: '#d0d0d4', fontSize: 12, marginTop: 10},
   errorBg: {backgroundColor: 'rgba(0,0,0,0.78)', paddingHorizontal: 24},
   errorTitle: {color: '#fff', fontSize: 16, fontWeight: '700'},
@@ -538,7 +539,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   primaryBtn: {
-    backgroundColor: '#2f81f7',
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -549,7 +550,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#5a5a60',
+    borderColor: colors.textFaint,
   },
   ghostBtnText: {color: '#e5e5e8', fontWeight: '500', fontSize: 14},
   topBar: {
@@ -570,7 +571,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     gap: 5,
   },
-  liveDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff3b30'},
+  liveDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: colors.live},
   liveText: {color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.6},
   engineBadge: {
     backgroundColor: 'rgba(0,0,0,0.55)',
@@ -595,12 +596,12 @@ const styles = StyleSheet.create({
     minWidth: 40,
     height: 34,
     borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(139,92,246,0.28)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
   },
   ctrlWide: {paddingHorizontal: 14},
-  ctrlPressed: {backgroundColor: 'rgba(255,255,255,0.28)'},
+  ctrlPressed: {backgroundColor: 'rgba(139,92,246,0.55)'},
   ctrlText: {color: '#fff', fontSize: 13, fontWeight: '600'},
 });

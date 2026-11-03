@@ -31,7 +31,7 @@ import type {Channel} from '../types';
 const SWIPE_THRESHOLD = 48;
 const epgIdOf = (c: Channel) => c.tvgId ?? c.epgChannelId ?? c.id;
 
-export function MainScreen() {
+export function MainScreen({ready = true}: {ready?: boolean}) {
   const insets = useSafeAreaInsets();
 
   // ── Store ────────────────────────────────────────────────────────────────
@@ -67,11 +67,12 @@ export function MainScreen() {
 
   // Hiç kaynak yoksa ekleme penceresini bir kez otomatik aç
   useEffect(() => {
-    if (hydrated && sources.length === 0 && !autoOpened.current) {
+    // Açılış ekranı bitmeden pencere açılmasın
+    if (ready && hydrated && sources.length === 0 && !autoOpened.current) {
       autoOpened.current = true;
       setModalOpen(true);
     }
-  }, [hydrated, sources.length]);
+  }, [ready, hydrated, sources.length]);
 
   // EPG ilerleme çubukları için dakikada bir saat tikle
   useEffect(() => {
@@ -246,7 +247,7 @@ export function MainScreen() {
     <SafeAreaView style={styles.root} edges={['top']}>
       {/* Üst başlık */}
       <View style={styles.header}>
-        <Text style={styles.brand}>IPTV</Text>
+        <Text style={styles.brand}>PASHAPLAY</Text>
         <Pressable onPress={() => setModalOpen(true)} hitSlop={10} style={styles.headerBtn}>
           <Text style={styles.headerBtnText}>Kaynaklar</Text>
         </Pressable>
@@ -356,7 +357,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
   },
-  brand: {color: colors.text, fontSize: 18, fontWeight: '800', letterSpacing: 1.2},
+  brand: {color: colors.gold, fontSize: 17, fontWeight: '800', letterSpacing: 4},
   headerBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
