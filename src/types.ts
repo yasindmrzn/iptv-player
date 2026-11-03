@@ -41,6 +41,8 @@ export type VodItem = {
   categoryId: string;
   rating?: string;
   ext: string;
+  /** Sunucuya eklenme zamanı (epoch sn) */
+  added?: number;
 };
 
 export type SeriesItem = {
@@ -50,6 +52,8 @@ export type SeriesItem = {
   categoryId: string;
   plot?: string;
   rating?: string;
+  /** Son güncelleme / eklenme zamanı (epoch sn) */
+  added?: number;
 };
 
 export type Episode = {

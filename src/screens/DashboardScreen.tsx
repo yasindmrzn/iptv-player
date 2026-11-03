@@ -57,6 +57,22 @@ export function DashboardScreen({onOpenItem, onOpenChannel, onTab}: Props) {
     () => [...series.items].filter(i => i.cover).sort((a, b) => rate(b) - rate(a)).slice(0, 16),
     [series.items],
   );
+  const newest = (items: Item[]) =>
+    [...items].filter(i => i.cover && i.added).sort((a, b) => (b.added ?? 0) - (a.added ?? 0)).slice(0, 16);
+  const newVod = useMemo(() => newest(vod.items), [vod.items]);
+  const newSeries = useMemo(() => newest(series.items), [series.items]);
+
+  const pickRandom = useCallback(() => {
+    const pool: {kind: 'vod' | 'series'; item: Item}[] = [
+      ...vod.items.filter(i => i.cover).map(item => ({kind: 'vod' as const, item})),
+      ...series.items.filter(i => i.cover).map(item => ({kind: 'series' as const, item})),
+    ];
+    if (pool.length) {
+      const p = pool[Math.floor(Math.random() * pool.length)];
+      onOpenItem(p.kind, p.item);
+    }
+  }, [vod.items, series.items, onOpenItem]);
+
   const favChannels = useMemo(
     () => channels.filter(c => favorites[c.id]).slice(0, 12),
     [channels, favorites],
@@ -107,6 +123,35 @@ export function DashboardScreen({onOpenItem, onOpenChannel, onTab}: Props) {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
       <Hero slides={slides} width={width} onOpen={onOpenItem} />
+
+      <Pressable onPress={pickRandom} style={styles.randomBtn}>
+        <Text style={styles.randomGlyph}>🎲</Text>
+        <Text style={styles.randomText}>RASTGELE SEÇ</Text>
+      </Pressable>
+
+      {newVod.length > 0 ? (
+        <Shelf title="Son Eklenen Filmler" action="Tümü" onAction={() => onTab('vod')}>
+          <FlatList
+            horizontal
+            data={newVod}
+            keyExtractor={i => i.id}
+            renderItem={renderPoster('vod')}
+            {...shelfProps}
+          />
+        </Shelf>
+      ) : null}
+
+      {newSeries.length > 0 ? (
+        <Shelf title="Son Eklenen Diziler" action="Tümü" onAction={() => onTab('series')}>
+          <FlatList
+            horizontal
+            data={newSeries}
+            keyExtractor={i => i.id}
+            renderItem={renderPoster('series')}
+            {...shelfProps}
+          />
+        </Shelf>
+      ) : null}
 
       {recent.length > 0 ? (
         <Shelf title="Son İzlenenler">
@@ -341,6 +386,21 @@ const styles = StyleSheet.create({
   dots: {flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 12},
   dot: {width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border},
   dotOn: {width: 20, backgroundColor: colors.gold},
+  randomBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 50,
+    marginHorizontal: PAD,
+    marginTop: 18,
+    borderRadius: 16,
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
+  randomGlyph: {fontSize: 18},
+  randomText: {color: colors.gold, fontSize: 13, fontFamily: fonts.xbold, letterSpacing: 2.5},
   shelf: {marginTop: 22},
   shelfHead: {
     flexDirection: 'row',

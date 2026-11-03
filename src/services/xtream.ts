@@ -188,6 +188,11 @@ const toCats = (raw: unknown): Category[] =>
     name: c.category_name,
   }));
 
+function toEpoch(v: unknown): number | undefined {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 export async function fetchVodCategories(c: XtreamCredentials): Promise<Category[]> {
   return toCats(await getJson<unknown>(apiUrl(c, 'get_vod_categories')));
 }
@@ -201,6 +206,7 @@ export async function fetchVodItems(c: XtreamCredentials): Promise<VodItem[]> {
       rating?: string | number | null;
       category_id?: string | number | null;
       container_extension?: string | null;
+      added?: string | number | null;
     }>
   >(apiUrl(c, 'get_vod_streams'), 90000);
   if (!Array.isArray(raw)) {
@@ -213,6 +219,7 @@ export async function fetchVodItems(c: XtreamCredentials): Promise<VodItem[]> {
     categoryId: String(v.category_id ?? ''),
     rating: v.rating != null && v.rating !== '' ? String(v.rating) : undefined,
     ext: v.container_extension || 'mp4',
+    added: toEpoch(v.added),
   }));
 }
 
@@ -237,6 +244,7 @@ export async function fetchSeriesItems(c: XtreamCredentials): Promise<SeriesItem
       plot?: string | null;
       rating?: string | number | null;
       category_id?: string | number | null;
+      last_modified?: string | number | null;
     }>
   >(apiUrl(c, 'get_series'), 90000);
   if (!Array.isArray(raw)) {
@@ -249,6 +257,7 @@ export async function fetchSeriesItems(c: XtreamCredentials): Promise<SeriesItem
     plot: s.plot || undefined,
     categoryId: String(s.category_id ?? ''),
     rating: s.rating != null && s.rating !== '' ? String(s.rating) : undefined,
+    added: toEpoch(s.last_modified),
   }));
 }
 

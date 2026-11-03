@@ -253,15 +253,15 @@ async function main() {
         json([{category_id: '10', category_name: 'Aksiyon'}]);
       } else if (action === 'get_vod_streams') {
         json([
-          {stream_id: 501, name: 'Film A', stream_icon: 'http://x/a.jpg', rating: '7.5', category_id: '10', container_extension: 'mkv'},
-          {stream_id: 502, name: 'Film B', rating: '', category_id: 10},
+          {stream_id: 501, name: 'Film A', stream_icon: 'http://x/a.jpg', rating: '7.5', category_id: '10', container_extension: 'mkv', added: '1700000300'},
+          {stream_id: 502, name: 'Film B', rating: '', category_id: 10, added: '1700000900'},
         ]);
       } else if (action === 'get_vod_info') {
         json({info: {plot: 'Özet metni', genre: 'Aksiyon', releasedate: '2021-05-04', duration: '01:58:00', rating: 7.4, youtube_trailer: 'abc123', backdrop_path: ['http://x/b.jpg']}});
       } else if (action === 'get_series_categories') {
         json([{category_id: '20', category_name: 'Drama'}]);
       } else if (action === 'get_series') {
-        json([{series_id: 7, name: 'Dizi X', cover: 'http://x/c.jpg', plot: 'Özet', rating: 8, category_id: '20'}]);
+        json([{series_id: 7, name: 'Dizi X', cover: 'http://x/c.jpg', plot: 'Özet', rating: 8, category_id: '20', last_modified: '1700000500'}]);
       } else if (action === 'get_series_info') {
         json({
           episodes: {
@@ -349,6 +349,7 @@ async function main() {
         ['501', 'Film A', '10', '7.5', 'mkv'],
         ['502', 'Film B', '10', undefined, 'mp4'],
       ]);
+      eq(items.map(v => v.added), [1700000300, 1700000900]);
       eq(vodUrl(creds, items[0]), `${base}/movie/u/p%20w%26d/501.mkv`);
     });
     await t('Film ayrıntıları ve fragman bağlantısı', async () => {
@@ -360,7 +361,7 @@ async function main() {
     await t('Diziler: liste + sezon/bölüm sıralaması + URL', async () => {
       eq(await fetchSeriesCategories(creds), [{id: '20', name: 'Drama'}]);
       const list = await fetchSeriesItems(creds);
-      eq([list[0].id, list[0].rating, list[0].plot], ['7', '8', 'Özet']);
+      eq([list[0].id, list[0].rating, list[0].plot, list[0].added], ['7', '8', 'Özet', 1700000500]);
       const eps = await fetchSeriesEpisodes(creds, '7');
       eq(eps.map(e => [e.season, e.number, e.title]), [
         [1, 1, 'Pilot'],

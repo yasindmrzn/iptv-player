@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -19,8 +20,10 @@ import {
 import Orientation from 'react-native-orientation-locker';
 import Video, {
   ResizeMode,
+  SelectedTrackType,
   ViewType,
   type OnBufferData,
+  type OnTextTracksData,
   type OnVideoErrorData,
   type ReactVideoSource,
   type VideoRef,
@@ -162,6 +165,9 @@ function VideoPlayerBase({
   const [errorText, setErrorText] = useState<string | null>(null);
   const [position, setPosition] = useState(0); // sn (yalnızca vod)
   const [duration, setDuration] = useState(0); // sn (yalnızca vod)
+  const [textTracks, setTextTracks] = useState<SubTrack[]>([]);
+  const [subSel, setSubSel] = useState<number | null>(null); // null = kapalı
+  const [subMenu, setSubMenu] = useState(false);
   const [vlcSeek, setVlcSeek] = useState<number | undefined>(undefined);
   const [barWidth, setBarWidth] = useState(0);
   const nativeRef = useRef<VideoRef>(null);
@@ -204,6 +210,9 @@ function VideoPlayerBase({
     setPosition(0);
     setDuration(0);
     setVlcSeek(undefined);
+    setTextTracks([]);
+    setSubSel(null);
+    setSubMenu(false);
     statusRef.current = 'loading';
     setStatus('loading');
     onStatusChange?.('loading');
@@ -381,6 +390,28 @@ function VideoPlayerBase({
     }
   };
 
+  // Altyazı: Türkçe varsa otomatik aç; yoksa kapalı bırak, kullanıcı seçsin
+  const applyTracks = useCallback((list: SubTrack[]) => {
+    setTextTracks(list);
+    const tr = list.find(t => /^(tr|tur)|türk|turk/i.test(t.language ?? t.label));
+    setSubSel(cur => (cur != null ? cur : tr ? tr.key : null));
+  }, []);
+
+  const onNativeTextTracks = useCallback(
+    ({textTracks: tt}: OnTextTracksData) => {
+      if (vod) {
+        applyTracks(
+          tt.map(t => ({
+            key: t.index,
+            label: subLabel(t.title, t.language, t.index),
+            language: t.language ?? t.title,
+          })),
+        );
+      }
+    },
+    [vod, applyTracks],
+  );
+
   const seekTo = (sec: number) => {
     const t = Math.max(0, duration > 0 ? Math.min(duration - 1, sec) : sec);
     setPosition(t);
@@ -422,6 +453,12 @@ function VideoPlayerBase({
           progressUpdateInterval={vod ? 500 : 2000}
           automaticallyWaitsToMinimizeStalling
           preferredForwardBufferDuration={30}
+          selectedTextTrack={
+            subSel == null
+              ? {type: SelectedTrackType.DISABLED}
+              : {type: SelectedTrackType.INDEX, value: subSel}
+          }
+          onTextTracks={onNativeTextTracks}
           onLoadStart={() => updateStatus('loading')}
           onReadyForDisplay={markPlaying}
           onBuffer={onNativeBuffer}
@@ -457,6 +494,18 @@ function VideoPlayerBase({
           autoplay
           autoAspectRatio
           seek={vlcSeek}
+          textTrack={subSel == null ? -1 : subSel}
+          onLoad={e => {
+            if (vod) {
+              applyTracks(
+                (e.textTracks ?? []).map(t => ({
+                  key: t.id,
+                  label: subLabel(t.name, undefined, t.id),
+                  language: t.name,
+                })),
+              );
+            }
+          }}
           onBuffering={() => {
             if (statusRef.current !== 'playing') {
               updateStatus('buffering');
@@ -519,6 +568,36 @@ function VideoPlayerBase({
         )}
       </View>
 
+      {/* Altyazı seçimi */}
+      {vod && subMenu && (
+        <View style={styles.subMenu}>
+          <ScrollView style={{maxHeight: fullscreenMode ? 220 : 110}}>
+            <SubRow
+              label="Kapalı"
+              active={subSel == null}
+              onPress={() => {
+                setSubSel(null);
+                setSubMenu(false);
+              }}
+            />
+            {textTracks.map(t => (
+              <SubRow
+                key={t.key}
+                label={t.label}
+                active={subSel === t.key}
+                onPress={() => {
+                  setSubSel(t.key);
+                  setSubMenu(false);
+                }}
+              />
+            ))}
+            {textTracks.length === 0 && (
+              <Text style={styles.subNone}>Bu videoda altyazı bulunamadı</Text>
+            )}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Alt kontroller */}
       {controlsVisible && status !== 'error' && (
         <View style={styles.bottomBar}>
@@ -564,7 +643,18 @@ function VideoPlayerBase({
                 }}
               />
             </View>
-            <CtrlButton label={fullscreenMode ? '⤡' : '⤢'} onPress={toggleFullscreen} />
+            <View style={styles.row}>
+              {vod && (
+                <CtrlButton
+                  label={subSel == null ? 'CC' : 'CC ●'}
+                  onPress={() => {
+                    setSubMenu(m => !m);
+                    showControls();
+                  }}
+                />
+              )}
+              <CtrlButton label={fullscreenMode ? '⤡' : '⤢'} onPress={toggleFullscreen} />
+            </View>
           </View>
         </View>
       )}
@@ -593,6 +683,33 @@ function VideoPlayerBase({
         </Modal>
       )}
     </View>
+  );
+}
+
+type SubTrack = {key: number; label: string; language?: string};
+
+const LANGS: Record<string, string> = {
+  tr: 'Türkçe', tur: 'Türkçe', en: 'İngilizce', eng: 'İngilizce', de: 'Almanca', ger: 'Almanca',
+  deu: 'Almanca', fr: 'Fransızca', fre: 'Fransızca', fra: 'Fransızca', ar: 'Arapça', ara: 'Arapça',
+  ru: 'Rusça', rus: 'Rusça', es: 'İspanyolca', spa: 'İspanyolca', it: 'İtalyanca', ita: 'İtalyanca',
+};
+
+function subLabel(title: string | undefined, lang: string | undefined, i: number): string {
+  const l = lang ? LANGS[lang.toLowerCase()] ?? lang.toUpperCase() : undefined;
+  if (l && title && !title.toLowerCase().includes(l.toLowerCase().slice(0, 3))) {
+    return `${l} · ${title}`;
+  }
+  return l ?? title ?? `Altyazı ${i + 1}`;
+}
+
+function SubRow({label, active, onPress}: {label: string; active: boolean; onPress: () => void}) {
+  return (
+    <Pressable onPress={onPress} style={styles.subRow} hitSlop={2}>
+      <Text style={[styles.subText, active && styles.subTextOn]} numberOfLines={1}>
+        {label}
+      </Text>
+      {active ? <Text style={styles.subTextOn}>✓</Text> : null}
+    </Pressable>
   );
 }
 
@@ -641,6 +758,29 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   containerFull: {flex: 1, width: '100%', backgroundColor: '#000', overflow: 'hidden'},
+  subMenu: {
+    position: 'absolute',
+    right: 10,
+    bottom: 56,
+    minWidth: 170,
+    maxWidth: '70%',
+    borderRadius: 14,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(20,20,20,0.94)',
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  subRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  subText: {color: colors.text, fontSize: 13, flexShrink: 1},
+  subTextOn: {color: colors.gold, fontFamily: fonts.bold, fontSize: 13},
+  subNone: {color: colors.textDim, fontSize: 12, padding: 12},
   fsRoot: {flex: 1, backgroundColor: '#000'},
   controlsRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   center: {alignItems: 'center', justifyContent: 'center'},
