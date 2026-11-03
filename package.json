@@ -7,7 +7,8 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "test:services": "tsx scripts/test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/patch-native-libs.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",
