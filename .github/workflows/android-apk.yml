@@ -22,8 +22,19 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Android SDK lisanslarını kabul et
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Android SDK bileşenlerini kur (yeniden denemeli)
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          for i in 1 2 3; do
+            if "$SDKM" "platforms;android-37" "build-tools;37.0.0" "ndk;27.1.12297006"; then
+              exit 0
+            fi
+            echo "Deneme $i başarısız, tekrar deneniyor..."
+            rm -rf "$ANDROID_HOME/ndk/27.1.12297006"
+            sleep 10
+          done
+          exit 1
 
       - name: Bağımlılıkları kur
         run: npm ci --legacy-peer-deps
