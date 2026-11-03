@@ -252,10 +252,12 @@ async function main() {
       } else if (action === 'get_vod_categories') {
         json([{category_id: '10', category_name: 'Aksiyon'}]);
       } else if (action === 'get_vod_streams') {
+        const only = u.searchParams.get('category_id');
         json([
           {stream_id: 501, name: 'Film A', stream_icon: 'http://x/a.jpg', rating: '7.5', category_id: '10', container_extension: 'mkv', added: '1700000300'},
           {stream_id: 502, name: 'Film B', rating: '', category_id: 10, added: '1700000900'},
-        ]);
+          {stream_id: 503, name: 'Film C', category_id: '11'},
+        ].filter(v => !only || String(v.category_id) === only));
       } else if (action === 'get_vod_info') {
         json({info: {plot: 'Özet metni', genre: 'Aksiyon', releasedate: '2021-05-04', duration: '01:58:00', rating: 7.4, youtube_trailer: 'abc123', backdrop_path: ['http://x/b.jpg']}});
       } else if (action === 'get_series_categories') {
@@ -344,7 +346,8 @@ async function main() {
     await t('VOD: kategori, liste, varsayılan uzantı ve URL', async () => {
       const cats = await fetchVodCategories(creds);
       eq(cats, [{id: '10', name: 'Aksiyon'}]);
-      const items = await fetchVodItems(creds);
+      eq((await fetchVodItems(creds, '11')).map(v => v.name), ['Film C']);
+      const items = (await fetchVodItems(creds)).slice(0, 2);
       eq(items.map(v => [v.id, v.name, v.categoryId, v.rating, v.ext]), [
         ['501', 'Film A', '10', '7.5', 'mkv'],
         ['502', 'Film B', '10', undefined, 'mp4'],

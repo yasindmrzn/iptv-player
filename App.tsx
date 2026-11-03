@@ -15,6 +15,9 @@ import {MainScreen} from './src/screens/MainScreen';
 import {PlayerScreen} from './src/screens/PlayerScreen';
 import {SeriesDetailScreen} from './src/screens/SeriesDetailScreen';
 import {episodeUrl, vodUrl} from './src/services/xtream';
+import {VideoPlayer} from './src/components/VideoPlayer';
+import {useFullscreenStore} from './src/store/useFullscreenStore';
+import {runBack} from './src/utils/backStack';
 import {useCatalogStore} from './src/store/useCatalogStore';
 import {useIptvStore} from './src/store/useIptvStore';
 import {colors, fonts} from './src/theme';
@@ -48,6 +51,7 @@ export default function App() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const overlay = overlays[overlays.length - 1];
+  const fsReq = useFullscreenStore(s => s.req);
 
   const pushOverlay = useCallback((o: Overlay) => setOverlays(s => [...s, o]), []);
   const popOverlay = useCallback(() => setOverlays(s => s.slice(0, -1)), []);
@@ -57,6 +61,8 @@ export default function App() {
   const refreshAll = useCallback(() => {
     void useIptvStore.getState().refreshAccount();
     void useIptvStore.getState().loadLive(true);
+    void useCatalogStore.getState().loadCats('vod', true);
+    void useCatalogStore.getState().loadCats('series', true);
     void useCatalogStore.getState().loadVod(true);
     void useCatalogStore.getState().loadSeries(true);
   }, []);
@@ -89,6 +95,9 @@ export default function App() {
   // Android geri tuşu: üst katman → ana sayfa sekmesi → uygulamadan çık
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (runBack()) {
+        return true;
+      }
       if (detail) {
         setDetail(null);
         return true;
@@ -248,6 +257,17 @@ export default function App() {
           {content}
         </FadeIn>
       </View>
+      {fsReq ? (
+        <View style={styles.fsLayer}>
+          <VideoPlayer
+            channel={fsReq.channel}
+            vod={fsReq.vod}
+            fullscreenMode
+            startAt={fsReq.startAt}
+            onExitFullscreen={fsReq.onExit}
+          />
+        </View>
+      ) : null}
       {!splashDone && (
         <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
           <SplashScreen onDone={onSplashDone} />
@@ -258,6 +278,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  fsLayer: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000', zIndex: 50, elevation: 50},
   shell: {flex: 1, backgroundColor: colors.bg},
   header: {
     flexDirection: 'row',

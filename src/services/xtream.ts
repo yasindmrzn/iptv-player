@@ -197,7 +197,10 @@ export async function fetchVodCategories(c: XtreamCredentials): Promise<Category
   return toCats(await getJson<unknown>(apiUrl(c, 'get_vod_categories')));
 }
 
-export async function fetchVodItems(c: XtreamCredentials): Promise<VodItem[]> {
+export async function fetchVodItems(
+  c: XtreamCredentials,
+  categoryId?: string,
+): Promise<VodItem[]> {
   const raw = await getJson<
     Array<{
       stream_id: number | string;
@@ -208,7 +211,10 @@ export async function fetchVodItems(c: XtreamCredentials): Promise<VodItem[]> {
       container_extension?: string | null;
       added?: string | number | null;
     }>
-  >(apiUrl(c, 'get_vod_streams'), 90000);
+  >(
+    apiUrl(c, 'get_vod_streams', categoryId ? `&category_id=${encodeURIComponent(categoryId)}` : ''),
+    categoryId ? 45000 : 120000,
+  );
   if (!Array.isArray(raw)) {
     return [];
   }
@@ -235,7 +241,10 @@ export async function fetchSeriesCategories(c: XtreamCredentials): Promise<Categ
   return toCats(await getJson<unknown>(apiUrl(c, 'get_series_categories')));
 }
 
-export async function fetchSeriesItems(c: XtreamCredentials): Promise<SeriesItem[]> {
+export async function fetchSeriesItems(
+  c: XtreamCredentials,
+  categoryId?: string,
+): Promise<SeriesItem[]> {
   const raw = await getJson<
     Array<{
       series_id: number | string;
@@ -246,7 +255,10 @@ export async function fetchSeriesItems(c: XtreamCredentials): Promise<SeriesItem
       category_id?: string | number | null;
       last_modified?: string | number | null;
     }>
-  >(apiUrl(c, 'get_series'), 90000);
+  >(
+    apiUrl(c, 'get_series', categoryId ? `&category_id=${encodeURIComponent(categoryId)}` : ''),
+    categoryId ? 45000 : 120000,
+  );
   if (!Array.isArray(raw)) {
     return [];
   }

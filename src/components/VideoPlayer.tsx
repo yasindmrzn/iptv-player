@@ -8,11 +8,9 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -30,7 +28,10 @@ import Video, {
 } from 'react-native-video';
 import {VLCPlayer} from 'react-native-vlc-media-player';
 
+import {useFullscreenStore} from '../store/useFullscreenStore';
 import {colors, fonts} from '../theme';
+import {registerBack} from '../utils/backStack';
+import {setImmersive} from '../utils/immersive';
 import type {Channel, PlayerEngine} from '../types';
 import {
   chooseEngine,
@@ -223,6 +224,7 @@ function VideoPlayerBase({
     () => () => {
       if (!fullscreenMode) {
         Orientation.lockToPortrait();
+        setImmersive(false);
       }
       if (hideTimer.current) {
         clearTimeout(hideTimer.current);
@@ -279,6 +281,13 @@ function VideoPlayerBase({
     }, vod ? START_TIMEOUT_MS * 2 : START_TIMEOUT_MS);
     return () => clearTimeout(t);
   }, [channel, attempt, engine, handleFailure, vod, fsOpen]);
+
+  useEffect(() => {
+    if (!fullscreenMode) {
+      return;
+    }
+    return registerBack(() => onExitFullscreen?.(positionRef.current));
+  }, [fullscreenMode, onExitFullscreen]);
 
   const markPlaying = useCallback(() => {
     retryCount.current = 0;
@@ -373,10 +382,22 @@ function VideoPlayerBase({
   );
 
   const enterFullscreen = () => {
+    if (!channel) {
+      return;
+    }
     Orientation.lockToLandscape();
+    setImmersive(true);
     setFsOpen(true);
+    useFullscreenStore.getState().open({
+      channel,
+      vod,
+      startAt: vod ? positionRef.current : 0,
+      onExit: leaveFullscreen,
+    });
   };
   const leaveFullscreen = (pos: number) => {
+    useFullscreenStore.getState().close();
+    setImmersive(false);
     Orientation.lockToPortrait();
     resumeRef.current = vod ? pos : 0;
     setFsOpen(false);
@@ -658,30 +679,6 @@ function VideoPlayerBase({
           </View>
         </View>
       )}
-
-      {/* Tam ekran: yatay Modal içinde ikinci bir oynatıcı; satır içi olan susturulur */}
-      {!fullscreenMode && (
-        <Modal
-          visible={fsOpen}
-          animationType="fade"
-          supportedOrientations={['landscape', 'landscape-left', 'landscape-right']}
-          statusBarTranslucent
-          onRequestClose={() => leaveFullscreen(positionRef.current)}>
-          <StatusBar hidden />
-          <View style={styles.fsRoot}>
-            {fsOpen ? (
-              <VideoPlayer
-                channel={channel}
-                vod={vod}
-                fullscreenMode
-                startAt={vod ? positionRef.current : 0}
-                onExitFullscreen={leaveFullscreen}
-                onStatusChange={onStatusChange}
-              />
-            ) : null}
-          </View>
-        </Modal>
-      )}
     </View>
   );
 }
@@ -781,7 +778,6 @@ const styles = StyleSheet.create({
   subText: {color: colors.text, fontSize: 13, flexShrink: 1},
   subTextOn: {color: colors.gold, fontFamily: fonts.bold, fontSize: 13},
   subNone: {color: colors.textDim, fontSize: 12, padding: 12},
-  fsRoot: {flex: 1, backgroundColor: '#000'},
   controlsRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   center: {alignItems: 'center', justifyContent: 'center'},
   row: {flexDirection: 'row', alignItems: 'center', gap: 8},

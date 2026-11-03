@@ -104,6 +104,14 @@ export function MainScreen() {
     [channels, favorites],
   );
 
+  const groupCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    channels.forEach(c => {
+      m[c.group] = (m[c.group] ?? 0) + 1;
+    });
+    return m;
+  }, [channels]);
+
   const currentIndex = useMemo(
     () => (currentChannel ? filtered.findIndex(c => c.id === currentChannel.id) : -1),
     [filtered, currentChannel],
@@ -244,6 +252,8 @@ export function MainScreen() {
         groups={groups}
         selected={category}
         favoriteCount={favoriteCount}
+        counts={groupCounts}
+        total={channels.length}
         onSelect={setCategory}
       />
 

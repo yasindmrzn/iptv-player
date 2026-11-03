@@ -1,3 +1,23 @@
+/** Geçici ağ hatalarında artan beklemeyle yeniden dener. */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  tries = 3,
+  baseMs = 800,
+): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      if (i < tries - 1) {
+        await new Promise<void>(r => setTimeout(r, baseMs * 2 ** i));
+      }
+    }
+  }
+  throw last;
+}
+
 export async function fetchWithTimeout(
   url: string,
   init: RequestInit = {},
