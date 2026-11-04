@@ -43,7 +43,7 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci --legacy-peer-deps
 
-      - name: APK derle (release: PashaPlay + ParisPlayer)
+      - name: APK derle (release - PashaPlay ve ParisPlayer)
         working-directory: android
         run: |
           chmod +x gradlew
