@@ -31,6 +31,8 @@ export type Brand = {
   tagline: string;
   whatsapp: string;
   email?: string;
+  /** Sabit sunucu adresi: verilirse girişte sunucu alanı gösterilmez */
+  server?: string;
   /** Eyfel Kulesi çizimlerini göster */
   eiffel: boolean;
   palette: Palette;
@@ -67,6 +69,7 @@ const BRANDS: Record<BrandId, Brand> = {
     name: 'PARISPLAYER',
     tagline: 'PARİS · PREMIUM TV',
     whatsapp: '+90 505 660 08 31',
+    server: 'http://parispanel.shop:8080',
     eiffel: true,
     palette: {
       bg: '#060b16',

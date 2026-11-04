@@ -25,7 +25,7 @@ export function LoginScreen() {
   const login = useIptvStore(s => s.login);
   const saved = useIptvStore(s => s.account);
 
-  const [server, setServer] = useState(saved?.server ?? '');
+  const [server, setServer] = useState(brand.server ?? saved?.server ?? '');
   const [username, setUsername] = useState(saved?.username ?? '');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,13 +38,15 @@ export function LoginScreen() {
       return;
     }
     if (!server.trim() || !username.trim() || !password) {
-      setError('Sunucu, kullanıcı adı ve şifreyi girin.');
+      setError(
+        brand.server ? 'Kullanıcı adı ve şifreyi girin.' : 'Sunucu, kullanıcı adı ve şifreyi girin.',
+      );
       return;
     }
     setError(null);
     setBusy(true);
     try {
-      await login({server, username, password});
+      await login({server: brand.server ?? server, username, password});
     } catch (e) {
       setError(
         e instanceof Error
@@ -75,6 +77,7 @@ export function LoginScreen() {
             <Text style={styles.cardTitle}>Giriş yap</Text>
             <Text style={styles.cardSub}>Abonelik bilgilerinizi girin</Text>
 
+            {brand.server ? null : (
             <Field
               label="Sunucu"
               value={server}
@@ -84,6 +87,7 @@ export function LoginScreen() {
               returnKeyType="next"
               onSubmitEditing={() => userRef.current?.focus()}
             />
+            )}
             <Field
               inputRef={userRef}
               label="Kullanıcı adı"
