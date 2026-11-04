@@ -10,6 +10,7 @@ import {TopTabs, type TabKey} from './src/components/TopTabs';
 import {CatalogScreen} from './src/screens/CatalogScreen';
 import {DashboardScreen} from './src/screens/DashboardScreen';
 import {FavoritesScreen} from './src/screens/FavoritesScreen';
+import {ProfilesScreen, Avatar} from './src/screens/ProfilesScreen';
 import {LoginScreen} from './src/screens/LoginScreen';
 import {MainScreen} from './src/screens/MainScreen';
 import {PlayerScreen} from './src/screens/PlayerScreen';
@@ -28,6 +29,17 @@ type Overlay =
   | {name: 'player'; channel: Channel; title: string; subtitle?: string};
 
 type Detail = {kind: 'vod'; item: VodItem} | {kind: 'series'; item: SeriesItem};
+
+/** Kapat (güç) simgesi: View ile çizilir, cihaz fontuna bağlı değildir. */
+function PowerIcon() {
+  return (
+    <View style={styles.powerBox}>
+      <View style={styles.powerRing} />
+      <View style={styles.powerGap} />
+      <View style={styles.powerLine} />
+    </View>
+  );
+}
 
 function formatExpiry(ms?: number): string | null {
   if (!ms) {
@@ -52,6 +64,10 @@ export default function App() {
   const [contactOpen, setContactOpen] = useState(false);
   const overlay = overlays[overlays.length - 1];
   const fsReq = useFullscreenStore(s => s.req);
+  const profileScreen = useIptvStore(s => s.profileScreen);
+  const profiles = useIptvStore(s => s.profiles);
+  const activeProfileId = useIptvStore(s => s.activeProfileId);
+  const activeProfile = profiles.find(p => p.id === activeProfileId);
 
   const pushOverlay = useCallback((o: Overlay) => setOverlays(s => [...s, o]), []);
   const popOverlay = useCallback(() => setOverlays(s => s.slice(0, -1)), []);
@@ -96,6 +112,10 @@ export default function App() {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (runBack()) {
+        return true;
+      }
+      if (useIptvStore.getState().profileScreen && useIptvStore.getState().profilePicked) {
+        useIptvStore.getState().setProfileScreen(false);
         return true;
       }
       if (detail) {
@@ -188,6 +208,9 @@ export default function App() {
   if (hydrated) {
     if (!account) {
       content = <LoginScreen />;
+    } else if (profileScreen) {
+      contentKey = 'profiles';
+      content = <ProfilesScreen />;
     } else if (overlay?.name === 'seriesDetail') {
       contentKey = `series-${overlay.series.id}`;
       content = (
@@ -217,8 +240,15 @@ export default function App() {
               <Pressable onPress={() => setContactOpen(true)} hitSlop={10} style={styles.logout}>
                 <Text style={styles.contactText}>İletişim</Text>
               </Pressable>
-              <Pressable onPress={confirmLogout} hitSlop={10} style={styles.logout}>
-                <Text style={styles.logoutText}>Çıkış</Text>
+              {activeProfile ? (
+                <Pressable
+                  onPress={() => useIptvStore.getState().setProfileScreen(true)}
+                  hitSlop={8}>
+                  <Avatar profile={activeProfile} size={32} />
+                </Pressable>
+              ) : null}
+              <Pressable onPress={confirmLogout} hitSlop={10} style={styles.powerBtn}>
+                <PowerIcon />
               </Pressable>
             </View>
           </View>
@@ -298,8 +328,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassBorder,
   },
-  headerBtns: {flexDirection: 'row', gap: 8},
+  headerBtns: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  powerBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  powerBox: {width: 18, height: 18, alignItems: 'center'},
+  powerRing: {
+    position: 'absolute',
+    top: 1,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.gold,
+  },
+  powerGap: {position: 'absolute', top: -1, width: 7, height: 6, backgroundColor: '#1a1a1a'},
+  powerLine: {position: 'absolute', top: -1, width: 2, height: 9, borderRadius: 1, backgroundColor: colors.gold},
   contactText: {color: colors.gold, fontSize: 12, fontFamily: fonts.semi},
-  logoutText: {color: colors.text, fontSize: 12, fontFamily: fonts.semi},
   body: {flex: 1},
 });

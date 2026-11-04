@@ -876,7 +876,7 @@ function TrackRow({label, active, onPress}: {label: string; active: boolean; onP
 
 /** Üst/alt karartma: gradyan kütüphanesi olmadan, artan opaklıkta üst üste şeritler. */
 function Shade({edge}: {edge: 'top' | 'bottom'}) {
-  const steps = [0.15, 0.3, 0.45, 0.6, 0.72];
+  const steps = [0.03, 0.07, 0.12, 0.2, 0.3];
   const layers = edge === 'top' ? steps : [...steps].reverse();
   return (
     <View
@@ -962,7 +962,7 @@ const styles = StyleSheet.create({
   flashR: {right: '12%'},
   flashText: {color: '#fff', fontSize: 18, fontFamily: fonts.bold},
 
-  shade: {position: 'absolute', left: 0, right: 0, height: '42%'},
+  shade: {position: 'absolute', left: 0, right: 0, height: '30%'},
   topBar: {
     position: 'absolute',
     top: 8,
@@ -998,7 +998,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     borderWidth: 2,
     borderColor: colors.gold,
     alignItems: 'center',

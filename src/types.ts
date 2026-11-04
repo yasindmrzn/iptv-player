@@ -92,6 +92,14 @@ export type VodDetails = {
   backdrop?: string;
 };
 
+export type Profile = {id: string; name: string; color: string};
+
+export type ProfileData = {
+  favorites: Record<string, true>;
+  recent: RecentItem[];
+  lastChannelId: string | null;
+};
+
 export type RecentItem =
   | {kind: 'vod'; item: VodItem; ts: number}
   | {kind: 'series'; item: SeriesItem; ts: number};
