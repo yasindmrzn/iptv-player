@@ -1,7 +1,11 @@
 import React, {useEffect, useRef} from 'react';
 import {Animated, Easing, StyleSheet, Text, View} from 'react-native';
 
+import {brand} from '../brand';
 import {colors, fonts} from '../theme';
+import {EiffelMark} from './EiffelMark';
+
+const LONG = brand.name.length > 9;
 
 type Props = {onDone: () => void};
 
@@ -47,9 +51,23 @@ export function SplashScreen({onDone}: Props) {
       <View style={[styles.glow, styles.glowBig]} />
       <View style={[styles.glow, styles.glowSmall]} />
 
+      {brand.eiffel ? (
+        <Animated.View
+          style={{
+            opacity: title,
+            marginBottom: 18,
+            transform: [
+              {scale: title.interpolate({inputRange: [0, 1], outputRange: [0.92, 1]})},
+            ],
+          }}>
+          <EiffelMark height={170} />
+        </Animated.View>
+      ) : null}
+
       <Animated.Text
         style={[
           styles.title,
+          LONG && {fontSize: 29, letterSpacing: 5, paddingLeft: 5},
           {
             opacity: title,
             transform: [
@@ -57,7 +75,7 @@ export function SplashScreen({onDone}: Props) {
             ],
           },
         ]}>
-        PASHAPLAY
+        {brand.name}
       </Animated.Text>
 
       <Animated.View
@@ -68,7 +86,7 @@ export function SplashScreen({onDone}: Props) {
       />
 
       <Animated.View style={{opacity: tagline}}>
-        <Text style={styles.tagline}>PREMIUM TV</Text>
+        <Text style={styles.tagline}>{brand.tagline}</Text>
       </Animated.View>
     </Animated.View>
   );

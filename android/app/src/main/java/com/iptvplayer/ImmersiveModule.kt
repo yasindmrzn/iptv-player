@@ -17,6 +17,9 @@ import com.facebook.react.uimanager.ViewManager
 class ImmersiveModule(private val ctx: ReactApplicationContext) : ReactContextBaseJavaModule(ctx) {
   override fun getName() = "Immersive"
 
+  // JS tarafı hangi marka (pasha / paris) olduğunu buradan okur
+  override fun getConstants(): MutableMap<String, Any> = hashMapOf("brand" to BuildConfig.BRAND)
+
   @ReactMethod
   fun set(on: Boolean) {
     val activity = ctx.currentActivity ?: return

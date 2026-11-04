@@ -43,37 +43,42 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci --legacy-peer-deps
 
-      - name: APK derle (release)
+      - name: APK derle (release: PashaPlay + ParisPlayer)
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assemblePashaRelease assembleParisRelease --no-daemon
 
       - name: APK'ları doğrula (imza, minimum Android sürümü, boyut)
         run: |
           BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
-          for APK in android/app/build/outputs/apk/release/*.apk; do
+          for APK in android/app/build/outputs/apk/*/release/*.apk; do
             echo "== $APK"
             ls -la "$APK"
             "$ANDROID_HOME/build-tools/$BT/apksigner" verify --verbose "$APK" | head -4
-            "$ANDROID_HOME/build-tools/$BT/aapt2" dump badging "$APK" | grep -E "^package|^sdkVersion|^native-code"
+            "$ANDROID_HOME/build-tools/$BT/aapt2" dump badging "$APK" | grep -E "^package|^application-label:|^sdkVersion|^native-code"
           done
 
       - name: APK'ları yükle (artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: pashaplay-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          name: apk
+          path: android/app/build/outputs/apk/*/release/*.apk
           if-no-files-found: error
 
       - name: GitHub Release olarak yayınla (zip'siz doğrudan indirme)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          OUT=android/app/build/outputs/apk/release
-          cp "$OUT/app-arm64-v8a-release.apk"   PashaPlay-arm64.apk
-          cp "$OUT/app-armeabi-v7a-release.apk" PashaPlay-arm32-eski-cihaz.apk
-          gh release create "build-${{ github.run_number }}" PashaPlay-arm64.apk PashaPlay-arm32-eski-cihaz.apk \
-            --title "PashaPlay #${{ github.run_number }}" \
-            --notes "Çoğu telefon için PashaPlay-arm64.apk dosyasını kurun. Yalnızca eski 32-bit telefon/TV kutusu için PashaPlay-arm32-eski-cihaz.apk kullanın." \
+          P=android/app/build/outputs/apk/pasha/release
+          Q=android/app/build/outputs/apk/paris/release
+          cp "$P/app-pasha-arm64-v8a-release.apk"   PashaPlay-arm64.apk
+          cp "$P/app-pasha-armeabi-v7a-release.apk" PashaPlay-arm32-eski-cihaz.apk
+          cp "$Q/app-paris-arm64-v8a-release.apk"   ParisPlayer-arm64.apk
+          cp "$Q/app-paris-armeabi-v7a-release.apk" ParisPlayer-arm32-eski-cihaz.apk
+          gh release create "build-${{ github.run_number }}" \
+            PashaPlay-arm64.apk PashaPlay-arm32-eski-cihaz.apk \
+            ParisPlayer-arm64.apk ParisPlayer-arm32-eski-cihaz.apk \
+            --title "PashaPlay + ParisPlayer #${{ github.run_number }}" \
+            --notes "Çoğu telefon için *-arm64.apk dosyasını kurun. Yalnızca eski 32-bit telefon/TV kutusu için *-arm32-eski-cihaz.apk kullanın." \
             --latest

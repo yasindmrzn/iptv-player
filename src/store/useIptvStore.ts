@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {create} from 'zustand';
 import {createJSONStorage, persist} from 'zustand/middleware';
 
+import {brand} from '../brand';
 import {epgKey} from '../services/epg';
 import {
   fetchXtreamChannels,
@@ -66,7 +67,7 @@ type State = {
 let liveToken = 0;
 
 export const PROFILE_COLORS = [
-  '#D4AF37',
+  brand.palette.gold,
   '#E5484D',
   '#3E63DD',
   '#30A46C',

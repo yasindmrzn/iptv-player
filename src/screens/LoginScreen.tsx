@@ -14,6 +14,8 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {ContactLinks} from '../components/ContactSheet';
 import {FadeIn} from '../components/FadeIn';
 import {PressableScale} from '../components/PressableScale';
+import {brand} from '../brand';
+import {EiffelMark} from '../components/EiffelMark';
 import {useIptvStore} from '../store/useIptvStore';
 import {colors, fonts} from '../theme';
 
@@ -55,6 +57,7 @@ export function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.root}>
+      <EiffelMark height={620} opacity={0.07} style={styles.bgTower} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -62,9 +65,10 @@ export function LoginScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled">
           <FadeIn style={styles.brandBox}>
-            <Text style={styles.brand}>PASHAPLAY</Text>
+            <EiffelMark height={96} style={{marginBottom: 14}} />
+            <Text style={[styles.brand, brand.name.length > 9 && styles.brandLong]}>{brand.name}</Text>
             <View style={styles.rule} />
-            <Text style={styles.tagline}>PREMIUM TV</Text>
+            <Text style={styles.tagline}>{brand.tagline}</Text>
           </FadeIn>
 
           <FadeIn delay={120} style={styles.card}>
@@ -165,6 +169,8 @@ function Field({
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: colors.bg},
   flex: {flex: 1},
+  bgTower: {position: 'absolute', bottom: -30, right: -40},
+  brandLong: {fontSize: 25, letterSpacing: 5, paddingLeft: 5},
   scroll: {flexGrow: 1, justifyContent: 'center', padding: 22},
   brandBox: {alignItems: 'center', marginBottom: 34},
   brand: {

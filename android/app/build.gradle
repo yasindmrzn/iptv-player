@@ -78,6 +78,24 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.iptvplayer"
+    buildFeatures {
+        buildConfig true
+    }
+    flavorDimensions "brand"
+    productFlavors {
+        // PashaPlay: mevcut uygulama (kullanıcıların üzerine güncelleme kurulabilsin diye kimlik aynı kalır)
+        pasha {
+            dimension "brand"
+            applicationId "com.iptvplayer"
+            buildConfigField "String", "BRAND", '"pasha"'
+        }
+        // ParisPlayer: ayrı kimlik; PashaPlay ile yan yana kurulabilir
+        paris {
+            dimension "brand"
+            applicationId "com.parisplayer.app"
+            buildConfigField "String", "BRAND", '"paris"'
+        }
+    }
     defaultConfig {
         applicationId "com.iptvplayer"
         minSdkVersion rootProject.ext.minSdkVersion

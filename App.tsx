@@ -21,6 +21,8 @@ import {useFullscreenStore} from './src/store/useFullscreenStore';
 import {runBack} from './src/utils/backStack';
 import {useCatalogStore} from './src/store/useCatalogStore';
 import {useIptvStore} from './src/store/useIptvStore';
+import {brand} from './src/brand';
+import {EiffelMark} from './src/components/EiffelMark';
 import {colors, fonts} from './src/theme';
 import type {Channel, Episode, SeriesItem, VodItem} from './src/types';
 
@@ -232,9 +234,12 @@ export default function App() {
       content = (
         <SafeAreaView style={styles.shell} edges={['top']}>
           <View style={styles.header}>
-            <View>
-              <Text style={styles.logo}>PASHAPLAY</Text>
+            <View style={styles.logoRow}>
+              <EiffelMark height={34} />
+              <View>
+              <Text style={[styles.logo, brand.name.length > 9 && styles.logoLong]}>{brand.name}</Text>
               {expiry ? <Text style={styles.expiry}>Bitiş · {expiry}</Text> : null}
+              </View>
             </View>
             <View style={styles.headerBtns}>
               <Pressable onPress={() => setContactOpen(true)} hitSlop={10} style={styles.logout}>
@@ -318,6 +323,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 4,
   },
+  logoRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  logoLong: {fontSize: 16, letterSpacing: 3},
   logo: {color: colors.gold, fontSize: 19, fontFamily: fonts.xbold, letterSpacing: 5},
   expiry: {color: colors.textFaint, fontSize: 10, marginTop: 2, letterSpacing: 0.4},
   logout: {
@@ -333,7 +340,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.glassBorder,
     alignItems: 'center',
@@ -349,7 +356,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.gold,
   },
-  powerGap: {position: 'absolute', top: -1, width: 7, height: 6, backgroundColor: '#1a1a1a'},
+  powerGap: {position: 'absolute', top: -1, width: 7, height: 6, backgroundColor: colors.surfaceAlt},
   powerLine: {position: 'absolute', top: -1, width: 2, height: 9, borderRadius: 1, backgroundColor: colors.gold},
   contactText: {color: colors.gold, fontSize: 12, fontFamily: fonts.semi},
   body: {flex: 1},

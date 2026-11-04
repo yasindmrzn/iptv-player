@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
+import {EiffelMark} from '../components/EiffelMark';
 import {FadeIn} from '../components/FadeIn';
 import {PROFILE_COLORS, useIptvStore} from '../store/useIptvStore';
 import {colors, fonts, goldGlow} from '../theme';
@@ -79,6 +80,7 @@ export function ProfilesScreen() {
 
   return (
     <SafeAreaView style={styles.root}>
+      <EiffelMark height={560} opacity={0.07} style={{position: 'absolute', bottom: -20, left: -30}} />
       <View style={styles.top}>
         {picked ? (
           <Pressable onPress={() => setProfileScreen(false)} hitSlop={12}>

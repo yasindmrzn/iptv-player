@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
+import {EiffelMark} from '../components/EiffelMark';
 import {ChannelCard, PosterCard} from '../components/MediaCard';
 import type {TabKey} from '../components/TopTabs';
 import {useCatalogStore} from '../store/useCatalogStore';
@@ -118,8 +119,10 @@ export function DashboardScreen({onOpenItem, onOpenChannel, onTab}: Props) {
   );
 
   return (
+    <View style={styles.root}>
+      <EiffelMark height={430} opacity={0.08} style={styles.watermark} />
     <ScrollView
-      style={styles.root}
+      style={styles.scroll}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
       <Hero slides={slides} width={width} onOpen={onOpenItem} />
@@ -208,6 +211,7 @@ export function DashboardScreen({onOpenItem, onOpenChannel, onTab}: Props) {
         />
       </Shelf>
     </ScrollView>
+    </View>
   );
 }
 
@@ -349,6 +353,8 @@ function Hero({
 
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: colors.bg},
+  scroll: {flex: 1},
+  watermark: {position: 'absolute', top: 40, right: -34},
   content: {paddingTop: 16, paddingBottom: 32},
   hero: {
     borderRadius: 22,

@@ -1,10 +1,11 @@
 import React from 'react';
 import {Alert, Linking, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 
+import {brand} from '../brand';
 import {colors, fonts, goldGlow} from '../theme';
 
-export const WHATSAPP_NUMBER = '+44 7853 701384';
-export const CONTACT_EMAIL = 'pashaservers@gmail.com';
+export const WHATSAPP_NUMBER = brand.whatsapp;
+export const CONTACT_EMAIL = brand.email;
 
 const open = (url: string) =>
   Linking.openURL(url).catch(() =>
@@ -13,7 +14,7 @@ const open = (url: string) =>
 
 export const openWhatsApp = () =>
   open(`https://wa.me/${WHATSAPP_NUMBER.replace(/\D/g, '')}`);
-export const openEmail = () => open(`mailto:${CONTACT_EMAIL}`);
+export const openEmail = () => (CONTACT_EMAIL ? open(`mailto:${CONTACT_EMAIL}`) : undefined);
 
 /** Giriş ekranı altında kullanılan iki satırlık iletişim bağlantıları. */
 export function ContactLinks() {
@@ -22,9 +23,11 @@ export function ContactLinks() {
       <Pressable onPress={openWhatsApp} hitSlop={8}>
         <Text style={styles.link}>WhatsApp · {WHATSAPP_NUMBER}</Text>
       </Pressable>
-      <Pressable onPress={openEmail} hitSlop={8}>
-        <Text style={styles.link}>{CONTACT_EMAIL}</Text>
-      </Pressable>
+      {CONTACT_EMAIL ? (
+        <Pressable onPress={openEmail} hitSlop={8}>
+          <Text style={styles.link}>{CONTACT_EMAIL}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -43,10 +46,12 @@ export function ContactSheet({visible, onClose}: {visible: boolean; onClose: () 
           <Text style={styles.primarySub}>{WHATSAPP_NUMBER}</Text>
         </Pressable>
 
-        <Pressable onPress={openEmail} style={styles.secondary}>
-          <Text style={styles.secondaryText}>E-posta</Text>
-          <Text style={styles.secondarySub}>{CONTACT_EMAIL}</Text>
-        </Pressable>
+        {CONTACT_EMAIL ? (
+          <Pressable onPress={openEmail} style={styles.secondary}>
+            <Text style={styles.secondaryText}>E-posta</Text>
+            <Text style={styles.secondarySub}>{CONTACT_EMAIL}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Modal>
   );
