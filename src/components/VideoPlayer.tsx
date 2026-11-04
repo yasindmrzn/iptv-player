@@ -8,9 +8,11 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
+  type GestureResponderEvent,
   StyleSheet,
   Text,
   View,
@@ -21,6 +23,7 @@ import Video, {
   SelectedTrackType,
   ViewType,
   type OnBufferData,
+  type OnAudioTracksData,
   type OnTextTracksData,
   type OnVideoErrorData,
   type ReactVideoSource,
@@ -160,7 +163,15 @@ function VideoPlayerBase({
   const [status, setStatus] = useState<Status>('loading');
   const [attempt, setAttempt] = useState(0); // Video bileşenini yeniden kurmak için
   const [userPaused, setUserPaused] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [audioTracks, setAudioTracks] = useState<SubTrack[]>([]);
+  const [audioSel, setAudioSel] = useState<number | null>(null); // null = varsayılan
+  const [scrub, setScrub] = useState<number | null>(null); // 0..1, sürüklerken
+  const [flash, setFlash] = useState<{side: 'l' | 'r'; id: number} | null>(null);
+  const ctl = useRef(new Animated.Value(1)).current;
+  const pausedRef = useRef(false);
+  const menuRef = useRef(false);
+  const lastTap = useRef({t: 0, side: 'c' as 'l' | 'c' | 'r'});
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fsOpen, setFsOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -212,6 +223,8 @@ function VideoPlayerBase({
     setDuration(0);
     setVlcSeek(undefined);
     setTextTracks([]);
+    setAudioTracks([]);
+    setAudioSel(null);
     setSubSel(null);
     setSubMenu(false);
     statusRef.current = 'loading';
@@ -300,11 +313,20 @@ function VideoPlayerBase({
     if (hideTimer.current) {
       clearTimeout(hideTimer.current);
     }
-    hideTimer.current = setTimeout(
-      () => setControlsVisible(false),
-      CONTROLS_HIDE_MS,
-    );
+    hideTimer.current = setTimeout(() => {
+      if (!pausedRef.current && !menuRef.current) {
+        setControlsVisible(false);
+      }
+    }, CONTROLS_HIDE_MS);
   }, []);
+
+  useEffect(() => {
+    Animated.timing(ctl, {
+      toValue: controlsVisible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [controlsVisible, ctl]);
 
   const toggleControls = useCallback(() => {
     if (controlsVisible) {
@@ -414,24 +436,36 @@ function VideoPlayerBase({
   // Altyazı: Türkçe varsa otomatik aç; yoksa kapalı bırak, kullanıcı seçsin
   const applyTracks = useCallback((list: SubTrack[]) => {
     setTextTracks(list);
+    if (!vod) {
+      return;
+    }
     const tr = list.find(t => /^(tr|tur)|türk|turk/i.test(t.language ?? t.label));
     setSubSel(cur => (cur != null ? cur : tr ? tr.key : null));
-  }, []);
+  }, [vod]);
 
   const onNativeTextTracks = useCallback(
     ({textTracks: tt}: OnTextTracksData) => {
-      if (vod) {
-        applyTracks(
-          tt.map(t => ({
-            key: t.index,
-            label: subLabel(t.title, t.language, t.index),
-            language: t.language ?? t.title,
-          })),
-        );
-      }
+      applyTracks(
+        tt.map(t => ({
+          key: t.index,
+          label: subLabel(t.title, t.language, t.index, 'Altyazı'),
+          language: t.language ?? t.title,
+        })),
+      );
     },
-    [vod, applyTracks],
+    [applyTracks],
   );
+
+  const onNativeAudioTracks = useCallback(({audioTracks: at}: OnAudioTracksData) => {
+    setAudioTracks(
+      at.map(t => ({
+        key: t.index,
+        label: subLabel(t.title, t.language, t.index, 'Ses'),
+        language: t.language ?? t.title,
+        selected: t.selected,
+      })),
+    );
+  }, []);
 
   const seekTo = (sec: number) => {
     const t = Math.max(0, duration > 0 ? Math.min(duration - 1, sec) : sec);
@@ -454,6 +488,44 @@ function VideoPlayerBase({
   }
 
   const isBusy = status === 'loading' || status === 'buffering';
+  const hasTracks = textTracks.length > 0 || audioTracks.length > 0;
+  const showTrackBtn = vod || hasTracks;
+  const frac =
+    scrub != null ? scrub : duration > 0 ? Math.min(1, Math.max(0, position / duration)) : 0;
+  const shownPos = scrub != null ? scrub * duration : position;
+
+  pausedRef.current = paused;
+  menuRef.current = subMenu;
+
+  const togglePlay = () => {
+    setUserPaused(p => !p);
+    showControls();
+  };
+
+  // Netflix gibi: tek dokunuş arayüzü açar/kapatır, ekranın sol/sağında çift dokunuş ±10 sn sarar
+  const onZoneTap = (side: 'l' | 'c' | 'r') => {
+    const now = Date.now();
+    const dbl = now - lastTap.current.t < 320 && lastTap.current.side === side;
+    lastTap.current = {t: now, side};
+    if (dbl && vod && side !== 'c') {
+      seekTo(position + (side === 'r' ? 10 : -10));
+      setFlash({side, id: now});
+      if (flashTimer.current) {
+        clearTimeout(flashTimer.current);
+      }
+      flashTimer.current = setTimeout(() => setFlash(null), 650);
+    } else if (controlsVisible) {
+      setControlsVisible(false);
+    } else {
+      showControls();
+    }
+  };
+
+  const scrubFrom = (e: GestureResponderEvent) => {
+    if (barWidth > 0) {
+      setScrub(Math.min(1, Math.max(0, e.nativeEvent.locationX / barWidth)));
+    }
+  };
 
   return (
     <View style={fullscreenMode ? styles.containerFull : styles.container}>
@@ -461,10 +533,9 @@ function VideoPlayerBase({
         <Video
           ref={nativeRef}
           key={`n-${channel.id}-${attempt}`}
-          style={StyleSheet.absoluteFill}
+          style={FILL}
           source={nativeSource}
           paused={paused}
-          muted={muted}
           resizeMode={resizeMode}
           // SurfaceView: donanım katmanında (overlay) çizim, en düşük CPU/GPU yükü
           viewType={ViewType.SURFACE}
@@ -479,7 +550,11 @@ function VideoPlayerBase({
               ? {type: SelectedTrackType.DISABLED}
               : {type: SelectedTrackType.INDEX, value: subSel}
           }
+          selectedAudioTrack={
+            audioSel == null ? undefined : {type: SelectedTrackType.INDEX, value: audioSel}
+          }
           onTextTracks={onNativeTextTracks}
+          onAudioTracks={onNativeAudioTracks}
           onLoadStart={() => updateStatus('loading')}
           onReadyForDisplay={markPlaying}
           onBuffer={onNativeBuffer}
@@ -507,25 +582,30 @@ function VideoPlayerBase({
       ) : (
         <VLCPlayer
           key={`v-${channel.id}-${attempt}`}
-          style={StyleSheet.absoluteFill}
+          style={FILL}
           source={vlcSource!}
           paused={paused}
-          muted={muted}
           resizeMode="contain"
           autoplay
           autoAspectRatio
           seek={vlcSeek}
           textTrack={subSel == null ? -1 : subSel}
+          audioTrack={audioSel ?? undefined}
           onLoad={e => {
-            if (vod) {
-              applyTracks(
-                (e.textTracks ?? []).map(t => ({
-                  key: t.id,
-                  label: subLabel(t.name, undefined, t.id),
-                  language: t.name,
-                })),
-              );
-            }
+            applyTracks(
+              (e.textTracks ?? []).map(t => ({
+                key: t.id,
+                label: subLabel(t.name, undefined, t.id, 'Altyazı'),
+                language: t.name,
+              })),
+            );
+            setAudioTracks(
+              (e.audioTracks ?? []).map(t => ({
+                key: t.id,
+                label: subLabel(t.name, undefined, t.id, 'Ses'),
+                language: t.name,
+              })),
+            );
           }}
           onBuffering={() => {
             if (statusRef.current !== 'playing') {
@@ -554,17 +634,29 @@ function VideoPlayerBase({
         />
       )}
 
-      {/* Dokunma katmanı */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={toggleControls} />
+      {/* Dokunma bölgeleri: sol / orta / sağ */}
+      <View style={styles.zones}>
+        <Pressable style={styles.zoneSide} onPress={() => onZoneTap('l')} />
+        <Pressable style={styles.zoneMid} onPress={() => onZoneTap('c')} />
+        <Pressable style={styles.zoneSide} onPress={() => onZoneTap('r')} />
+      </View>
+
+      {flash && (
+        <View
+          pointerEvents="none"
+          style={[styles.flash, flash.side === 'l' ? styles.flashL : styles.flashR]}>
+          <Text style={styles.flashText}>{flash.side === 'l' ? '« 10' : '10 »'}</Text>
+        </View>
+      )}
 
       {isBusy && (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.center]}>
+        <View pointerEvents="none" style={[FILL, styles.center]}>
           <ActivityIndicator size="large" color={colors.gold} />
         </View>
       )}
 
       {status === 'error' && (
-        <View style={[StyleSheet.absoluteFill, styles.center, styles.errorBg]}>
+        <View style={[FILL, styles.center, styles.errorBg]}>
           <Text style={styles.errorTitle}>Yayın açılamadı</Text>
           {errorText ? (
             <Text style={styles.errorSub} numberOfLines={2}>
@@ -577,113 +669,180 @@ function VideoPlayerBase({
         </View>
       )}
 
-      {/* Üst rozetler */}
-      <View pointerEvents="none" style={styles.topBar}>
-        {vod ? (
-          <View />
-        ) : (
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>CANLI</Text>
-          </View>
-        )}
-      </View>
+      {/* Netflix tarzı arayüz: üst/alt karartma, ortada büyük oynat-duraklat, altta ince ilerleme çizgisi */}
+      {status !== 'error' && (
+        <Animated.View
+          style={[FILL, {opacity: ctl}]}
+          pointerEvents={controlsVisible ? 'box-none' : 'none'}>
+          <Shade edge="top" />
+          <Shade edge="bottom" />
 
-      {/* Altyazı seçimi */}
-      {vod && subMenu && (
-        <View style={styles.subMenu}>
-          <ScrollView style={{maxHeight: fullscreenMode ? 220 : 110}}>
-            <SubRow
-              label="Kapalı"
-              active={subSel == null}
-              onPress={() => {
-                setSubSel(null);
-                setSubMenu(false);
-              }}
-            />
-            {textTracks.map(t => (
-              <SubRow
-                key={t.key}
-                label={t.label}
-                active={subSel === t.key}
-                onPress={() => {
-                  setSubSel(t.key);
-                  setSubMenu(false);
-                }}
-              />
-            ))}
-            {textTracks.length === 0 && (
-              <Text style={styles.subNone}>Bu videoda altyazı bulunamadı</Text>
+          <View style={styles.topBar} pointerEvents="box-none">
+            {fullscreenMode ? (
+              <Pressable onPress={toggleFullscreen} hitSlop={12} style={styles.backHit}>
+                <Text style={styles.backGlyph}>‹</Text>
+                <Text style={styles.topTitle} numberOfLines={1}>
+                  {channel.name}
+                </Text>
+              </Pressable>
+            ) : (
+              <View />
             )}
-          </ScrollView>
-        </View>
-      )}
+            {!vod && (
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>CANLI</Text>
+              </View>
+            )}
+          </View>
 
-      {/* Alt kontroller */}
-      {controlsVisible && status !== 'error' && (
-        <View style={styles.bottomBar}>
-          {vod && (
-            <View style={styles.seekRow}>
-              <Text style={styles.timeText}>{formatTime(position)}</Text>
-              <Pressable
-                style={styles.seekTrack}
-                onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
-                onPress={e => {
-                  if (barWidth > 0 && duration > 0) {
-                    seekTo((e.nativeEvent.locationX / barWidth) * duration);
-                  }
-                }}>
-                <View style={styles.seekBg}>
+          <View style={styles.centerRow} pointerEvents="box-none">
+            {vod && (
+              <Pressable onPress={() => seekTo(position - 10)} style={styles.skipBtn} hitSlop={8}>
+                <Text style={styles.skipText}>« 10</Text>
+              </Pressable>
+            )}
+            <Pressable onPress={togglePlay} style={styles.playBtn}>
+              {paused ? <PlayIcon /> : <PauseIcon />}
+            </Pressable>
+            {vod && (
+              <Pressable onPress={() => seekTo(position + 10)} style={styles.skipBtn} hitSlop={8}>
+                <Text style={styles.skipText}>10 »</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <View style={styles.bottom} pointerEvents="box-none">
+            {vod && (
+              <View style={styles.seekRow}>
+                <Text style={styles.timeText}>{formatTime(shownPos)}</Text>
+                <View
+                  style={styles.seekTrack}
+                  onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
+                  onStartShouldSetResponder={() => true}
+                  onMoveShouldSetResponder={() => true}
+                  onResponderTerminationRequest={() => false}
+                  onResponderGrant={e => {
+                    scrubFrom(e);
+                    if (hideTimer.current) {
+                      clearTimeout(hideTimer.current);
+                    }
+                  }}
+                  onResponderMove={scrubFrom}
+                  onResponderRelease={() => {
+                    if (scrub != null && duration > 0) {
+                      seekTo(scrub * duration);
+                    }
+                    setScrub(null);
+                    showControls();
+                  }}>
+                  <View style={styles.seekBg} pointerEvents="none">
+                    <View style={[styles.seekFill, {width: `${frac * 100}%`}]} />
+                  </View>
                   <View
+                    pointerEvents="none"
                     style={[
-                      styles.seekFill,
-                      {width: `${duration > 0 ? Math.min(100, (position / duration) * 100) : 0}%`},
+                      styles.thumb,
+                      scrub != null && styles.thumbBig,
+                      {left: `${frac * 100}%`},
                     ]}
                   />
                 </View>
-              </Pressable>
-              <Text style={styles.timeText}>{formatTime(duration)}</Text>
-            </View>
-          )}
-          <View style={styles.controlsRow}>
-            <View style={styles.row}>
-              <CtrlButton
-                label={paused ? '▶' : '❚❚'}
-                onPress={() => {
-                  setUserPaused(p => !p);
-                  showControls();
-                }}
-              />
-              {vod && <CtrlButton label="−10" onPress={() => seekTo(position - 10)} />}
-              {vod && <CtrlButton label="+10" onPress={() => seekTo(position + 10)} />}
-              <CtrlButton
-                label={muted ? '🔇' : '🔊'}
-                onPress={() => {
-                  setMuted(m => !m);
-                  showControls();
-                }}
-              />
-            </View>
-            <View style={styles.row}>
-              {vod && (
-                <CtrlButton
-                  label={subSel == null ? 'CC' : 'CC ●'}
+                <Text style={styles.timeText}>
+                  {duration > 0 ? `-${formatTime(Math.max(0, duration - shownPos))}` : '--:--'}
+                </Text>
+              </View>
+            )}
+            <View style={styles.actionsRow}>
+              {showTrackBtn ? (
+                <Pressable
                   onPress={() => {
-                    setSubMenu(m => !m);
+                    setSubMenu(true);
                     showControls();
                   }}
-                />
+                  style={styles.pill}
+                  hitSlop={6}>
+                  <View style={[styles.ccBox, subSel != null && styles.ccBoxOn]}>
+                    <Text style={[styles.ccText, subSel != null && styles.ccTextOn]}>CC</Text>
+                  </View>
+                  <Text style={styles.pillText}>Ses ve Altyazı</Text>
+                </Pressable>
+              ) : (
+                <View />
               )}
-              <CtrlButton label={fullscreenMode ? '⤡' : '⤢'} onPress={toggleFullscreen} />
+              <Pressable onPress={toggleFullscreen} hitSlop={10} style={styles.fsBtn}>
+                <FullscreenIcon exit={fullscreenMode} />
+              </Pressable>
             </View>
           </View>
+        </Animated.View>
+      )}
+
+      {/* Ses ve altyazı seçimi */}
+      {showTrackBtn && subMenu && (
+        <View style={[FILL, styles.menu]}>
+          <Pressable style={FILL} onPress={() => setSubMenu(false)} />
+          <View style={styles.menuBody} pointerEvents="box-none">
+            <View style={styles.menuCol}>
+              <Text style={styles.menuHead}>SES</Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {audioTracks.length === 0 && (
+                  <TrackRow label="Varsayılan ses" active onPress={() => setSubMenu(false)} />
+                )}
+                {audioTracks.map(t => (
+                  <TrackRow
+                    key={t.key}
+                    label={t.label}
+                    active={audioSel == null ? !!t.selected || audioTracks.length === 1 : audioSel === t.key}
+                    onPress={() => {
+                      setAudioSel(t.key);
+                      setSubMenu(false);
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+            <View style={styles.menuDivider} />
+            <View style={styles.menuCol}>
+              <Text style={styles.menuHead}>ALTYAZI</Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <TrackRow
+                  label="Kapalı"
+                  active={subSel == null}
+                  onPress={() => {
+                    setSubSel(null);
+                    setSubMenu(false);
+                  }}
+                />
+                {textTracks.map(t => (
+                  <TrackRow
+                    key={t.key}
+                    label={t.label}
+                    active={subSel === t.key}
+                    onPress={() => {
+                      setSubSel(t.key);
+                      setSubMenu(false);
+                    }}
+                  />
+                ))}
+                {textTracks.length === 0 && (
+                  <Text style={styles.subNone}>Altyazı bulunamadı</Text>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+          <Pressable onPress={() => setSubMenu(false)} hitSlop={12} style={styles.menuClose}>
+            <Text style={styles.menuCloseText}>×</Text>
+          </Pressable>
         </View>
       )}
     </View>
   );
 }
 
-type SubTrack = {key: number; label: string; language?: string};
+const FILL = {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0} as const;
+
+type SubTrack = {key: number; label: string; language?: string; selected?: boolean};
 
 const LANGS: Record<string, string> = {
   tr: 'Türkçe', tur: 'Türkçe', en: 'İngilizce', eng: 'İngilizce', de: 'Almanca', ger: 'Almanca',
@@ -691,22 +850,62 @@ const LANGS: Record<string, string> = {
   ru: 'Rusça', rus: 'Rusça', es: 'İspanyolca', spa: 'İspanyolca', it: 'İtalyanca', ita: 'İtalyanca',
 };
 
-function subLabel(title: string | undefined, lang: string | undefined, i: number): string {
+function subLabel(
+  title: string | undefined,
+  lang: string | undefined,
+  i: number,
+  fallback: string,
+): string {
   const l = lang ? LANGS[lang.toLowerCase()] ?? lang.toUpperCase() : undefined;
   if (l && title && !title.toLowerCase().includes(l.toLowerCase().slice(0, 3))) {
     return `${l} · ${title}`;
   }
-  return l ?? title ?? `Altyazı ${i + 1}`;
+  return l ?? title ?? `${fallback} ${i + 1}`;
 }
 
-function SubRow({label, active, onPress}: {label: string; active: boolean; onPress: () => void}) {
+function TrackRow({label, active, onPress}: {label: string; active: boolean; onPress: () => void}) {
   return (
-    <Pressable onPress={onPress} style={styles.subRow} hitSlop={2}>
-      <Text style={[styles.subText, active && styles.subTextOn]} numberOfLines={1}>
+    <Pressable onPress={onPress} style={styles.trackRow} hitSlop={2}>
+      <Text style={[styles.trackCheck, !active && styles.trackCheckOff]}>✓</Text>
+      <Text style={[styles.trackText, active && styles.trackTextOn]} numberOfLines={1}>
         {label}
       </Text>
-      {active ? <Text style={styles.subTextOn}>✓</Text> : null}
     </Pressable>
+  );
+}
+
+/** Üst/alt karartma: gradyan kütüphanesi olmadan, artan opaklıkta üst üste şeritler. */
+function Shade({edge}: {edge: 'top' | 'bottom'}) {
+  const steps = [0.15, 0.3, 0.45, 0.6, 0.72];
+  const layers = edge === 'top' ? steps : [...steps].reverse();
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.shade, edge === 'top' ? {top: 0} : {bottom: 0}]}>
+      {layers.map((a, i) => (
+        <View key={i} style={{flex: 1, backgroundColor: `rgba(0,0,0,${a})`}} />
+      ))}
+    </View>
+  );
+}
+
+// Simgeler View ile çizilir: cihaz fontuna bağlı olmadan her yerde aynı görünür.
+function PlayIcon() {
+  return <View style={styles.playTri} />;
+}
+function PauseIcon() {
+  return (
+    <View style={styles.pauseWrap}>
+      <View style={styles.pauseBar} />
+      <View style={styles.pauseBar} />
+    </View>
+  );
+}
+function FullscreenIcon({exit}: {exit?: boolean}) {
+  return (
+    <View style={styles.fsOuter}>
+      <View style={exit ? styles.fsInnerExit : styles.fsInner} />
+    </View>
   );
 }
 
@@ -721,29 +920,6 @@ function formatTime(sec: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
-function CtrlButton({
-  label,
-  onPress,
-  wide,
-}: {
-  label: string;
-  onPress: () => void;
-  wide?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={6}
-      style={({pressed}) => [
-        styles.ctrl,
-        wide && styles.ctrlWide,
-        pressed && styles.ctrlPressed,
-      ]}>
-      <Text style={styles.ctrlText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 export const VideoPlayer = memo(VideoPlayerBase);
 export default VideoPlayer;
 
@@ -755,42 +931,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   containerFull: {flex: 1, width: '100%', backgroundColor: '#000', overflow: 'hidden'},
-  subMenu: {
-    position: 'absolute',
-    right: 10,
-    bottom: 56,
-    minWidth: 170,
-    maxWidth: '70%',
-    borderRadius: 14,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(20,20,20,0.94)',
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-  },
-  subRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  subText: {color: colors.text, fontSize: 13, flexShrink: 1},
-  subTextOn: {color: colors.gold, fontFamily: fonts.bold, fontSize: 13},
-  subNone: {color: colors.textDim, fontSize: 12, padding: 12},
-  controlsRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   center: {alignItems: 'center', justifyContent: 'center'},
   row: {flexDirection: 'row', alignItems: 'center', gap: 8},
   emptyTitle: {color: '#fff', fontSize: 16, fontFamily: fonts.semi},
   errorBg: {backgroundColor: 'rgba(0,0,0,0.78)', paddingHorizontal: 24},
   errorTitle: {color: '#fff', fontSize: 16, fontFamily: fonts.bold},
-  errorSub: {
-    color: '#a0a0a6',
-    fontSize: 12,
-    marginTop: 6,
-    marginBottom: 14,
-    textAlign: 'center',
-  },
+  errorSub: {color: '#a0a0a6', fontSize: 12, marginTop: 6, marginBottom: 14, textAlign: 'center'},
   primaryBtn: {
     backgroundColor: colors.accent,
     borderRadius: 10,
@@ -798,15 +944,37 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   primaryBtnText: {color: colors.onAccent, fontFamily: fonts.semi, fontSize: 14},
+
+  zones: {...FILL, flexDirection: 'row'},
+  zoneSide: {flex: 1},
+  zoneMid: {flex: 1.1},
+  flash: {
+    position: 'absolute',
+    top: '30%',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flashL: {left: '12%'},
+  flashR: {right: '12%'},
+  flashText: {color: '#fff', fontSize: 18, fontFamily: fonts.bold},
+
+  shade: {position: 'absolute', left: 0, right: 0, height: '42%'},
   topBar: {
     position: 'absolute',
     top: 8,
-    left: 8,
-    right: 8,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  backHit: {flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1},
+  backGlyph: {color: '#fff', fontSize: 34, marginTop: -4},
+  topTitle: {color: '#fff', fontSize: 16, fontFamily: fonts.bold, flexShrink: 1},
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -818,47 +986,113 @@ const styles = StyleSheet.create({
   },
   liveDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: colors.live},
   liveText: {color: '#fff', fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.6},
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 12,
-    paddingTop: 22,
-    paddingBottom: 10,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    gap: 8,
-  },
-  ctrl: {
-    minWidth: 40,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: 'rgba(212,175,55,0.26)',
+
+  centerRow: {
+    ...FILL,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
+    gap: 34,
   },
-  ctrlWide: {paddingHorizontal: 14},
-  ctrlPressed: {backgroundColor: 'rgba(212,175,55,0.55)'},
-  ctrlText: {color: '#fff', fontSize: 13, fontFamily: fonts.semi},
-  seekRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
-  seekTrack: {
-    flex: 1,
-    height: 22,
+  playBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 2,
+    borderColor: colors.gold,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  seekBg: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    overflow: 'hidden',
+  playTri: {
+    marginLeft: 5,
+    width: 0,
+    height: 0,
+    borderTopWidth: 11,
+    borderBottomWidth: 11,
+    borderLeftWidth: 18,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: colors.gold,
   },
+  pauseWrap: {flexDirection: 'row', gap: 6},
+  pauseBar: {width: 6, height: 22, borderRadius: 2, backgroundColor: colors.gold},
+  skipBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipText: {color: '#fff', fontSize: 12, fontFamily: fonts.bold},
+
+  bottom: {position: 'absolute', left: 14, right: 14, bottom: 8},
+  seekRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  seekTrack: {flex: 1, height: 30, justifyContent: 'center'},
+  seekBg: {height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden'},
   seekFill: {height: 4, backgroundColor: colors.gold},
+  thumb: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginLeft: -7,
+    backgroundColor: colors.gold,
+  },
+  thumbBig: {width: 22, height: 22, borderRadius: 11, marginLeft: -11},
   timeText: {
-    color: '#e8e0f8',
+    color: '#e8e8e8',
     fontSize: 11,
-    minWidth: 38,
+    minWidth: 42,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },
+  actionsRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2},
+  pill: {flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingRight: 6},
+  ccBox: {
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  ccBoxOn: {borderColor: colors.gold, backgroundColor: colors.gold},
+  ccText: {color: '#fff', fontSize: 10, fontFamily: fonts.xbold},
+  ccTextOn: {color: colors.onAccent},
+  pillText: {color: '#fff', fontSize: 12, fontFamily: fonts.semi},
+  fsBtn: {width: 36, height: 36, alignItems: 'center', justifyContent: 'center'},
+  fsOuter: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 3,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+    padding: 2,
+  },
+  fsInner: {width: 8, height: 8, backgroundColor: '#fff'},
+  fsInnerExit: {width: 5, height: 5, backgroundColor: '#fff'},
+
+  menu: {backgroundColor: 'rgba(8,8,8,0.9)'},
+  menuBody: {
+    ...FILL,
+    flexDirection: 'row',
+    paddingHorizontal: 28,
+    paddingTop: 22,
+    paddingBottom: 14,
+    gap: 16,
+  },
+  menuCol: {flex: 1},
+  menuDivider: {width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.25)'},
+  menuHead: {color: colors.gold, fontSize: 11, fontFamily: fonts.xbold, letterSpacing: 2.5, marginBottom: 6},
+  trackRow: {flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8},
+  trackCheck: {color: colors.gold, fontSize: 14, width: 16},
+  trackCheckOff: {opacity: 0},
+  trackText: {color: '#c8c8c8', fontSize: 14, flexShrink: 1},
+  trackTextOn: {color: '#fff', fontFamily: fonts.bold},
+  subNone: {color: colors.textDim, fontSize: 12, paddingVertical: 8},
+  menuClose: {position: 'absolute', top: 6, right: 14},
+  menuCloseText: {color: '#fff', fontSize: 30},
 });
