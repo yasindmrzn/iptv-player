@@ -674,8 +674,6 @@ function VideoPlayerBase({
         <Animated.View
           style={[FILL, {opacity: ctl}]}
           pointerEvents={controlsVisible ? 'box-none' : 'none'}>
-          <Shade edge="top" />
-          <Shade edge="bottom" />
 
           <View style={styles.topBar} pointerEvents="box-none">
             {fullscreenMode ? (
@@ -874,21 +872,6 @@ function TrackRow({label, active, onPress}: {label: string; active: boolean; onP
   );
 }
 
-/** Üst/alt karartma: gradyan kütüphanesi olmadan, artan opaklıkta üst üste şeritler. */
-function Shade({edge}: {edge: 'top' | 'bottom'}) {
-  const steps = [0.03, 0.07, 0.12, 0.2, 0.3];
-  const layers = edge === 'top' ? steps : [...steps].reverse();
-  return (
-    <View
-      pointerEvents="none"
-      style={[styles.shade, edge === 'top' ? {top: 0} : {bottom: 0}]}>
-      {layers.map((a, i) => (
-        <View key={i} style={{flex: 1, backgroundColor: `rgba(0,0,0,${a})`}} />
-      ))}
-    </View>
-  );
-}
-
 // Simgeler View ile çizilir: cihaz fontuna bağlı olmadan her yerde aynı görünür.
 function PlayIcon() {
   return <View style={styles.playTri} />;
@@ -962,7 +945,6 @@ const styles = StyleSheet.create({
   flashR: {right: '12%'},
   flashText: {color: '#fff', fontSize: 18, fontFamily: fonts.bold},
 
-  shade: {position: 'absolute', left: 0, right: 0, height: '30%'},
   topBar: {
     position: 'absolute',
     top: 8,
@@ -974,7 +956,7 @@ const styles = StyleSheet.create({
   },
   backHit: {flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1},
   backGlyph: {color: '#fff', fontSize: 34, marginTop: -4},
-  topTitle: {color: '#fff', fontSize: 16, fontFamily: fonts.bold, flexShrink: 1},
+  topTitle: {textShadowColor: 'rgba(0,0,0,0.85)', textShadowRadius: 5, textShadowOffset: {width: 0, height: 1}, color: '#fff', fontSize: 16, fontFamily: fonts.bold, flexShrink: 1},
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -998,7 +980,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'transparent',
     borderWidth: 2,
     borderColor: colors.gold,
     alignItems: 'center',
@@ -1021,11 +1003,10 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  skipText: {color: '#fff', fontSize: 12, fontFamily: fonts.bold},
+  skipText: {textShadowColor: 'rgba(0,0,0,0.85)', textShadowRadius: 5, textShadowOffset: {width: 0, height: 1}, color: '#fff', fontSize: 12, fontFamily: fonts.bold},
 
   bottom: {position: 'absolute', left: 14, right: 14, bottom: 8},
   seekRow: {flexDirection: 'row', alignItems: 'center', gap: 10},
@@ -1042,6 +1023,7 @@ const styles = StyleSheet.create({
   },
   thumbBig: {width: 22, height: 22, borderRadius: 11, marginLeft: -11},
   timeText: {
+    textShadowColor: 'rgba(0,0,0,0.85)', textShadowRadius: 5, textShadowOffset: {width: 0, height: 1},
     color: '#e8e8e8',
     fontSize: 11,
     minWidth: 42,
@@ -1060,7 +1042,7 @@ const styles = StyleSheet.create({
   ccBoxOn: {borderColor: colors.gold, backgroundColor: colors.gold},
   ccText: {color: '#fff', fontSize: 10, fontFamily: fonts.xbold},
   ccTextOn: {color: colors.onAccent},
-  pillText: {color: '#fff', fontSize: 12, fontFamily: fonts.semi},
+  pillText: {textShadowColor: 'rgba(0,0,0,0.85)', textShadowRadius: 5, textShadowOffset: {width: 0, height: 1}, color: '#fff', fontSize: 12, fontFamily: fonts.semi},
   fsBtn: {width: 36, height: 36, alignItems: 'center', justifyContent: 'center'},
   fsOuter: {
     width: 20,
