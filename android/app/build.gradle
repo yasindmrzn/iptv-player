@@ -118,7 +118,7 @@ android {
             reset()
             enable true
             // TV kutularının çoğu 32-bit (armeabi-v7a) olduğundan TV için tek dosyada ikisini de içeren evrensel APK da üretilir
-            universalApk true
+            universalApk false
             include "arm64-v8a", "armeabi-v7a"
         }
     }
