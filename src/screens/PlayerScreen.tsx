@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {AppState, Pressable, StyleSheet, Text, View} from 'react-native';
+import {AppState, StyleSheet, Text, View, useWindowDimensions} from 'react-native';
+import {Pressable} from '../components/Focusable';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {VideoPlayer} from '../components/VideoPlayer';
@@ -16,11 +17,27 @@ type Props = {
 /** Film / dizi bölümü oynatma ekranı (16:9 oynatıcı + arama çubuğu). */
 export function PlayerScreen({channel, title, subtitle, onBack}: Props) {
   const [active, setActive] = useState(true);
+  const {width, height} = useWindowDimensions();
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', st => setActive(st === 'active'));
     return () => sub.remove();
   }, []);
+
+  // Yatay (TV): oynatıcı tüm ekranı kaplar; Geri tuşu / ‹ ile çıkılır
+  if (width > height * 1.2) {
+    return (
+      <View style={styles.root}>
+        <VideoPlayer
+          channel={channel}
+          paused={!active}
+          vod
+          fullscreenMode
+          onExitFullscreen={onBack}
+        />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.root}>

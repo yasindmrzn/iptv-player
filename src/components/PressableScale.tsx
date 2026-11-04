@@ -1,5 +1,6 @@
 import React, {useRef} from 'react';
-import {Animated, Pressable, type StyleProp, type ViewStyle} from 'react-native';
+import {Animated, type StyleProp, type ViewStyle} from 'react-native';
+import {Pressable} from './Focusable';
 
 type Props = {
   children: React.ReactNode;

@@ -18,7 +18,7 @@ class ImmersiveModule(private val ctx: ReactApplicationContext) : ReactContextBa
   override fun getName() = "Immersive"
 
   // JS tarafı hangi marka (pasha / paris) olduğunu buradan okur
-  override fun getConstants(): MutableMap<String, Any> = hashMapOf("brand" to BuildConfig.BRAND)
+  override fun getConstants(): MutableMap<String, Any> = hashMapOf("brand" to BuildConfig.BRAND, "tv" to (BuildConfig.DEVICE == "tv"))
 
   @ReactMethod
   fun set(on: Boolean) {

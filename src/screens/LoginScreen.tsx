@@ -194,6 +194,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   card: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
     backgroundColor: colors.surface,
     borderRadius: 22,
     padding: 22,

@@ -1,5 +1,6 @@
 import React from 'react';
-import {Alert, Linking, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Alert, Linking, Modal, StyleSheet, Text, View} from 'react-native';
+import {Pressable} from './Focusable';
 
 import {brand} from '../brand';
 import {colors, fonts, goldGlow} from '../theme';

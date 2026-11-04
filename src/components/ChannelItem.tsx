@@ -1,5 +1,6 @@
 import React, {memo, useState} from 'react';
-import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Image, StyleSheet, Text, View} from 'react-native';
+import {Pressable} from './Focusable';
 
 import {colors, ROW_HEIGHT, fonts} from '../theme';
 import type {Channel} from '../types';

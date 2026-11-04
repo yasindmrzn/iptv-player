@@ -3,13 +3,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import {Pressable} from '../components/Focusable';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {EiffelMark} from '../components/EiffelMark';

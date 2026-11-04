@@ -2,13 +2,13 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
+import {Pressable} from '../components/Focusable';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {PosterCard} from '../components/MediaCard';
@@ -24,7 +24,7 @@ type Props = {
   onSelect: (item: Item) => void;
 };
 
-const COLS = 3;
+const MIN_COL = 150;
 const GAP = 10;
 const PAD = 12;
 const ALL = '__all__';
@@ -128,6 +128,8 @@ export function CatalogScreen({mode, onSelect}: Props) {
     return open && debounced ? list.filter(i => i.name.toLowerCase().includes(debounced)) : list;
   }, [catItems, open, debounced]);
 
+  // Dikey telefonda 3 sütun; yatay (TV) ekranda genişliğe göre daha çok sütun
+  const COLS = Math.max(3, Math.floor((width - PAD * 2) / MIN_COL));
   const itemWidth = Math.floor((width - PAD * 2 - GAP * (COLS - 1)) / COLS);
   const renderPoster = useCallback(
     ({item}: {item: Item}) => <PosterCard item={item} width={itemWidth} onPress={onSelect} />,
@@ -176,7 +178,7 @@ export function CatalogScreen({mode, onSelect}: Props) {
         {searchBox}
         <FlatList
           data={shown}
-          key="grid"
+          key={`grid-${COLS}`}
           numColumns={COLS}
           keyExtractor={i => i.id}
           renderItem={renderPoster}

@@ -10,12 +10,13 @@ import {
   AppState,
   FlatList,
   PanResponder,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import {Pressable} from '../components/Focusable';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {CAT_ALL, CAT_FAV, CategoryTabs} from '../components/CategoryTabs';
@@ -32,6 +33,8 @@ const epgIdOf = (c: Channel) => c.tvgId ?? c.epgChannelId ?? c.id;
 
 export function MainScreen() {
   const insets = useSafeAreaInsets();
+  const {width, height} = useWindowDimensions();
+  const wide = width > height * 1.2;
 
   // ── Store ────────────────────────────────────────────────────────────────
   const channels = useIptvStore(s => s.channels);
@@ -225,16 +228,18 @@ export function MainScreen() {
     </View>
   );
 
-  return (
-    <SafeAreaView style={styles.root} edges={[]}>
-      {/* Oynatıcı: 16:9, üstte sabit; dikey kaydırma = kanal değiştir */}
-      <View {...swipe.panHandlers}>
-        <VideoPlayer channel={currentChannel} paused={!appActive} />
-      </View>
+  const playerBlock = (
+    <View {...swipe.panHandlers}>
+      <VideoPlayer channel={currentChannel} paused={!appActive} />
+    </View>
+  );
 
-      <EpgStrip channel={currentChannel} now={nowProg} next={nextProg} nowMs={nowMs} />
+  const epgBlock = (
+    <EpgStrip channel={currentChannel} now={nowProg} next={nextProg} nowMs={nowMs} />
+  );
 
-      {/* Arama + kategori sekmeleri */}
+  const listBlock = (
+    <>
       <View style={styles.searchWrap}>
         <TextInput
           value={query}
@@ -256,8 +261,6 @@ export function MainScreen() {
         total={channels.length}
         onSelect={setCategory}
       />
-
-      {/* Kanal listesi */}
       <FlatList
         ref={listRef}
         style={styles.list}
@@ -274,51 +277,81 @@ export function MainScreen() {
         keyboardDismissMode="on-drag"
         ListEmptyComponent={listEmpty}
       />
+    </>
+  );
 
-      {/* Alt çubuk: tek elle erişilebilir hızlı kanal değiştirme */}
-      <View style={[styles.zapBar, {paddingBottom: Math.max(insets.bottom, 10)}]}>
-        <Pressable
-          onPress={() => zap(-1)}
-          disabled={!filtered.length}
-          style={({pressed}) => [styles.zapBtn, pressed && styles.zapBtnPressed]}>
-          <Text style={styles.zapGlyph}>‹</Text>
-          <Text style={styles.zapLabel}>Önceki</Text>
-        </Pressable>
+  const zapBlock = (
+    <View
+      style={[
+        styles.zapBar,
+        wide && styles.zapBarWide,
+        {paddingBottom: wide ? 10 : Math.max(insets.bottom, 10)},
+      ]}>
+      <Pressable
+        onPress={() => zap(-1)}
+        disabled={!filtered.length}
+        style={({pressed}) => [styles.zapBtn, pressed && styles.zapBtnPressed]}>
+        <Text style={styles.zapGlyph}>‹</Text>
+        <Text style={styles.zapLabel}>Önceki</Text>
+      </Pressable>
 
-        <Pressable
-          style={styles.zapCenter}
-          onPress={() => {
-            if (currentIndex >= 0) {
-              try {
-                listRef.current?.scrollToIndex({
-                  index: currentIndex,
-                  viewPosition: 0.3,
-                  animated: true,
-                });
-              } catch {
-                /* yok say */
-              }
+      <Pressable
+        style={styles.zapCenter}
+        onPress={() => {
+          if (currentIndex >= 0) {
+            try {
+              listRef.current?.scrollToIndex({
+                index: currentIndex,
+                viewPosition: 0.3,
+                animated: true,
+              });
+            } catch {
+              /* yok say */
             }
-          }}>
-          <Text style={styles.zapName} numberOfLines={1}>
-            {currentChannel ? currentChannel.name : 'Kanal seçilmedi'}
-          </Text>
-          <Text style={styles.zapSub}>
-            {currentIndex >= 0
-              ? `${currentIndex + 1} / ${filtered.length}`
-              : `${filtered.length} kanal`}
-          </Text>
-        </Pressable>
+          }
+        }}>
+        <Text style={styles.zapName} numberOfLines={1}>
+          {currentChannel ? currentChannel.name : 'Kanal seçilmedi'}
+        </Text>
+        <Text style={styles.zapSub}>
+          {currentIndex >= 0
+            ? `${currentIndex + 1} / ${filtered.length}`
+            : `${filtered.length} kanal`}
+        </Text>
+      </Pressable>
 
-        <Pressable
-          onPress={() => zap(1)}
-          disabled={!filtered.length}
-          style={({pressed}) => [styles.zapBtn, pressed && styles.zapBtnPressed]}>
-          <Text style={styles.zapLabel}>Sonraki</Text>
-          <Text style={styles.zapGlyph}>›</Text>
-        </Pressable>
-      </View>
+      <Pressable
+        onPress={() => zap(1)}
+        disabled={!filtered.length}
+        style={({pressed}) => [styles.zapBtn, pressed && styles.zapBtnPressed]}>
+        <Text style={styles.zapLabel}>Sonraki</Text>
+        <Text style={styles.zapGlyph}>›</Text>
+      </Pressable>
+    </View>
+  );
 
+  // Yatay (TV): solda oynatıcı + program bilgisi + kanal değiştir, sağda arama ve kanal listesi
+  if (wide) {
+    return (
+      <SafeAreaView style={styles.root} edges={[]}>
+        <View style={styles.wideRow}>
+          <View style={[styles.wideLeft, {width: Math.round(width * 0.56)}]}>
+            {playerBlock}
+            {epgBlock}
+            {zapBlock}
+          </View>
+          <View style={styles.wideRight}>{listBlock}</View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.root} edges={[]}>
+      {playerBlock}
+      {epgBlock}
+      {listBlock}
+      {zapBlock}
     </SafeAreaView>
   );
 }
@@ -372,6 +405,10 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
+  wideRow: {flex: 1, flexDirection: 'row'},
+  wideLeft: {borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border},
+  wideRight: {flex: 1},
+  zapBarWide: {borderTopWidth: 0, backgroundColor: 'transparent', marginTop: 8},
   zapBtn: {
     flexDirection: 'row',
     alignItems: 'center',

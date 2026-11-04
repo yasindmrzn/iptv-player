@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {Alert, AppState, BackHandler, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {Alert, AppState, BackHandler, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {Pressable} from './src/components/Focusable';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
 import {ContactSheet} from './src/components/ContactSheet';

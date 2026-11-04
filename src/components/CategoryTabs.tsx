@@ -2,12 +2,12 @@ import React, {memo, useMemo, useState} from 'react';
 import {
   FlatList,
   Modal,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import {Pressable} from './Focusable';
 
 import {colors, fonts} from '../theme';
 

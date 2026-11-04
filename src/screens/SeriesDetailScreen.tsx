@@ -3,12 +3,12 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {Pressable} from '../components/Focusable';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {useCatalogStore} from '../store/useCatalogStore';

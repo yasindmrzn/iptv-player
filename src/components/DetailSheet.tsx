@@ -4,12 +4,12 @@ import {
   Image,
   Linking,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {Pressable} from './Focusable';
 
 import {fetchVodDetails, trailerUrl} from '../services/xtream';
 import {useIptvStore} from '../store/useIptvStore';
@@ -129,7 +129,10 @@ export function DetailSheet({visible, kind, item, onClose, onPrimary}: Props) {
 const styles = StyleSheet.create({
   backdrop: {flex: 1, backgroundColor: 'rgba(0,0,0,0.55)'},
   sheet: {
-    maxHeight: '78%',
+    maxHeight: '92%',
+    width: '100%',
+    maxWidth: 780,
+    alignSelf: 'center',
     backgroundColor: colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,

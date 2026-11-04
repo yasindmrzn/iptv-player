@@ -10,13 +10,13 @@ import {
   ActivityIndicator,
   Animated,
   Platform,
-  Pressable,
   ScrollView,
   type GestureResponderEvent,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {Pressable} from './Focusable';
 import Orientation from 'react-native-orientation-locker';
 import Video, {
   ResizeMode,
@@ -33,6 +33,7 @@ import {VLCPlayer} from 'react-native-vlc-media-player';
 
 import {useFullscreenStore} from '../store/useFullscreenStore';
 import {colors, fonts} from '../theme';
+import {isTv} from '../brand';
 import {registerBack} from '../utils/backStack';
 import {setImmersive} from '../utils/immersive';
 import type {Channel, PlayerEngine} from '../types';
@@ -236,7 +237,9 @@ function VideoPlayerBase({
   useEffect(
     () => () => {
       if (!fullscreenMode) {
-        Orientation.lockToPortrait();
+        if (!isTv) {
+          Orientation.lockToPortrait();
+        }
         setImmersive(false);
       }
       if (hideTimer.current) {
@@ -407,7 +410,9 @@ function VideoPlayerBase({
     if (!channel) {
       return;
     }
-    Orientation.lockToLandscape();
+    if (!isTv) {
+      Orientation.lockToLandscape();
+    }
     setImmersive(true);
     setFsOpen(true);
     useFullscreenStore.getState().open({
@@ -420,7 +425,9 @@ function VideoPlayerBase({
   const leaveFullscreen = (pos: number) => {
     useFullscreenStore.getState().close();
     setImmersive(false);
-    Orientation.lockToPortrait();
+    if (!isTv) {
+      Orientation.lockToPortrait();
+    }
     resumeRef.current = vod ? pos : 0;
     setFsOpen(false);
     setAttempt(a => a + 1); // canlıda yayına yeniden bağlan, filmde kaldığı yerden devam et

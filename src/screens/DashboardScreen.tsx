@@ -2,13 +2,13 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   FlatList,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
 } from 'react-native';
+import {Pressable} from '../components/Focusable';
 
 import {EiffelMark} from '../components/EiffelMark';
 import {ChannelCard, PosterCard} from '../components/MediaCard';
@@ -103,7 +103,7 @@ export function DashboardScreen({onOpenItem, onOpenChannel, onTab}: Props) {
     return out;
   }, [recent, topVod, topSeries]);
 
-  const rowPoster = Math.floor((width - PAD * 2) / 3.3);
+  const rowPoster = Math.min(Math.floor((width - PAD * 2) / 3.3), 170);
 
   const renderPoster = useCallback(
     (kind: 'vod' | 'series') =>
@@ -268,7 +268,7 @@ function Hero({
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList<Slide>>(null);
   const touching = useRef(false);
-  const cardW = width - PAD * 2;
+  const cardW = Math.min(width - PAD * 2, 720);
   const step = cardW + 12;
   const cardH = Math.round(cardW * 0.62);
 

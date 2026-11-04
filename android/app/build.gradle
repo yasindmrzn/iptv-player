@@ -90,6 +90,13 @@ android {
             buildConfigField "String", "BRAND", '"pasha"'
         }
         // ParisPlayer: ayrı kimlik; PashaPlay ile yan yana kurulabilir
+        // PashaPlay Android TV: yatay, kumanda (D-pad) uyumlu, TV ana ekranında görünür
+        pashaTv {
+            dimension "brand"
+            applicationId "com.iptvplayer.tv"
+            buildConfigField "String", "BRAND", '"pasha"'
+            buildConfigField "String", "DEVICE", '"tv"'
+        }
         paris {
             dimension "brand"
             applicationId "com.parisplayer.app"
@@ -98,6 +105,7 @@ android {
     }
     defaultConfig {
         applicationId "com.iptvplayer"
+        buildConfigField "String", "DEVICE", '"phone"'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -109,7 +117,8 @@ android {
         abi {
             reset()
             enable true
-            universalApk false
+            // TV kutularının çoğu 32-bit (armeabi-v7a) olduğundan TV için tek dosyada ikisini de içeren evrensel APK da üretilir
+            universalApk true
             include "arm64-v8a", "armeabi-v7a"
         }
     }

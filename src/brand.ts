@@ -91,5 +91,8 @@ const BRANDS: Record<BrandId, Brand> = {
   },
 };
 
-const native = NativeModules.Immersive as {brand?: string} | undefined;
+const native = NativeModules.Immersive as {brand?: string; tv?: boolean} | undefined;
+
+/** Android TV sürümü: yatay, kumanda ile gezinme */
+export const isTv = native?.tv === true;
 export const brand: Brand = BRANDS[native?.brand === 'paris' ? 'paris' : 'pasha'];
