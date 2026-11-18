@@ -16,7 +16,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let win;
-let meta = {brand: 'pasha', title: 'PashaPlay'};
+let meta = {brand: 'pasha', title: 'PashaPlayer'};
 try {
   meta = require('../dist/brand.json');
 } catch {

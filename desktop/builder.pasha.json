@@ -1,7 +1,7 @@
 {
   "appId": "com.iptvplayer.desktop",
-  "productName": "PashaPlay",
-  "copyright": "PashaPlay",
+  "productName": "PashaPlayer",
+  "copyright": "PashaPlayer",
   "directories": {
     "output": "release-pasha",
     "buildResources": "build"
@@ -38,13 +38,13 @@
     "perMachine": false,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "PashaPlay",
-    "artifactName": "PashaPlay-Windows-Kurulum.exe",
+    "shortcutName": "PashaPlayer",
+    "artifactName": "PashaPlayer-Windows-Kurulum.exe",
     "installerIcon": "build/icon-pasha.ico",
     "uninstallerIcon": "build/icon-pasha.ico"
   },
   "portable": {
-    "artifactName": "PashaPlay-Windows-Portable.exe"
+    "artifactName": "PashaPlayer-Windows-Portable.exe"
   },
   "asarUnpack": [
     "node_modules/ffmpeg-static/**"

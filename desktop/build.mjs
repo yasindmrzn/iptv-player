@@ -66,6 +66,6 @@ for (const f of ['Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
 }
 writeFileSync(
   path.join(here, 'dist/brand.json'),
-  JSON.stringify({brand: BRAND, title: BRAND === 'paris' ? 'ParisPlayer' : 'PashaPlay'}),
+  JSON.stringify({brand: BRAND, title: BRAND === 'paris' ? 'ParisPlayer' : 'PashaPlayer'}),
 );
 console.log('dist hazır:', BRAND);

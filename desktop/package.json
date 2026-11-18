@@ -1,9 +1,9 @@
 {
-  "name": "pashaplay-desktop",
-  "productName": "PashaPlay",
+  "name": "pashaplayer-desktop",
+  "productName": "PashaPlayer",
   "version": "1.0.0",
-  "description": "PashaPlay - Premium IPTV (Windows)",
-  "author": "PashaPlay",
+  "description": "PashaPlayer - Premium IPTV (Windows)",
+  "author": "PashaPlayer",
   "private": true,
   "main": "electron/main.js",
   "scripts": {

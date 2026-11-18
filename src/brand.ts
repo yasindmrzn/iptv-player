@@ -1,7 +1,7 @@
 import {NativeModules} from 'react-native';
 
 /**
- * Tek kod tabanından iki uygulama: PashaPlay (siyah/altın) ve ParisPlayer (lacivert-mavi/Eyfel).
+ * Tek kod tabanından iki uygulama: PashaPlayer (siyah/altın) ve ParisPlayer (lacivert-mavi/Eyfel).
  * Hangisi olduğu derleme sırasında (Gradle productFlavor → BuildConfig.BRAND) belirlenir
  * ve Immersive native modülünün sabiti olarak JS'e gelir.
  */
@@ -41,7 +41,7 @@ export type Brand = {
 const BRANDS: Record<BrandId, Brand> = {
   pasha: {
     id: 'pasha',
-    name: 'PASHAPLAY',
+    name: 'PASHAPLAYER',
     tagline: 'PREMIUM TV',
     whatsapp: '+44 7853 701384',
     email: 'pashaservers@gmail.com',

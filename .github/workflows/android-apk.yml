@@ -43,7 +43,7 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci --legacy-peer-deps
 
-      - name: APK derle (release - PashaPlay, ParisPlayer, PashaPlay TV)
+      - name: APK derle (release - PashaPlayer, ParisPlayer, PashaPlayer TV)
         working-directory: android
         run: |
           chmod +x gradlew
@@ -83,7 +83,7 @@ jobs:
             PashaPlay-arm64.apk PashaPlay-arm32-eski-cihaz.apk \
             ParisPlayer-arm64.apk ParisPlayer-arm32-eski-cihaz.apk \
             PashaPlay-TV-arm64.apk PashaPlay-TV-arm32.apk \
-            --title "PashaPlay + ParisPlayer + TV #${{ github.run_number }}" \
+            --title "PashaPlayer + ParisPlayer + TV #${{ github.run_number }}" \
             --notes "Çoğu telefon için *-arm64.apk dosyasını kurun. Yalnızca eski 32-bit telefon/TV kutusu için *-arm32-eski-cihaz.apk kullanın. Android TV / TV kutusu için PashaPlay-TV-arm64.apk (yeni TV) veya PashaPlay-TV-arm32.apk (eski TV kutusu)." \
             --latest
 
@@ -102,7 +102,7 @@ jobs:
         working-directory: desktop
         run: npm ci --legacy-peer-deps --no-audit --no-fund
 
-      - name: PashaPlay Windows (.exe) derle
+      - name: PashaPlayer Windows (.exe) derle
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -124,8 +124,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "build-${{ github.run_number }}" \
-            desktop/release-pasha/PashaPlay-Windows-Kurulum.exe \
-            desktop/release-pasha/PashaPlay-Windows-Portable.exe \
+            desktop/release-pasha/PashaPlayer-Windows-Kurulum.exe \
+            desktop/release-pasha/PashaPlayer-Windows-Portable.exe \
             desktop/release-paris/ParisPlayer-Windows-Kurulum.exe \
             desktop/release-paris/ParisPlayer-Windows-Portable.exe \
             --clobber

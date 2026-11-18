@@ -9,7 +9,7 @@ const LONG = brand.name.length > 9;
 
 type Props = {onDone: () => void};
 
-/** Açılış ekranı: PASHAPLAY yazısı belirir, altın çizgi açılır, sonra kaybolur. */
+/** Açılış ekranı: PASHAPLAYER yazısı belirir, altın çizgi açılır, sonra kaybolur. */
 export function SplashScreen({onDone}: Props) {
   const title = useRef(new Animated.Value(0)).current;
   const line = useRef(new Animated.Value(0)).current;
