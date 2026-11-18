@@ -91,7 +91,12 @@ const BRANDS: Record<BrandId, Brand> = {
   },
 };
 
-const native = NativeModules.Immersive as {brand?: string; tv?: boolean} | undefined;
+const native = NativeModules.Immersive as
+  | {brand?: string; tv?: boolean; noContact?: boolean}
+  | undefined;
+
+/** İletişim butonu/bağlantıları (bayi dağıtımı olan masaüstü sürümünde gizlenir) */
+export const showContact = native?.noContact !== true;
 
 /** Android TV sürümü: yatay, kumanda ile gezinme */
 export const isTv = native?.tv === true;

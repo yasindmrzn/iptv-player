@@ -102,15 +102,21 @@ jobs:
         working-directory: desktop
         run: npm ci --legacy-peer-deps --no-audit --no-fund
 
-      - name: Windows uygulamasını derle (.exe)
+      - name: PashaPlay Windows (.exe) derle
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run dist
+        run: npm run dist:pasha
+
+      - name: ParisPlayer Windows (.exe) derle
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run dist:paris
 
       - name: Çıktıları listele
         shell: bash
-        run: ls -la desktop/release/*.exe
+        run: ls -la desktop/release-*/*.exe
 
       - name: Release'e ekle
         shell: bash
@@ -118,6 +124,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "build-${{ github.run_number }}" \
-            desktop/release/PashaPlay-Windows-Kurulum.exe \
-            desktop/release/PashaPlay-Windows-Portable.exe \
+            desktop/release-pasha/PashaPlay-Windows-Kurulum.exe \
+            desktop/release-pasha/PashaPlay-Windows-Portable.exe \
+            desktop/release-paris/ParisPlayer-Windows-Kurulum.exe \
+            desktop/release-paris/ParisPlayer-Windows-Portable.exe \
             --clobber

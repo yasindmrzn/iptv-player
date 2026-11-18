@@ -78,4 +78,4 @@ yarn-error.log
 !desktop/build/
 desktop/node_modules/
 desktop/dist/
-desktop/release/
+desktop/release-*/

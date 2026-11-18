@@ -14,7 +14,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {ContactLinks} from '../components/ContactSheet';
 import {FadeIn} from '../components/FadeIn';
 import {PressableScale} from '../components/PressableScale';
-import {brand} from '../brand';
+import {brand, showContact} from '../brand';
 import {EiffelMark} from '../components/EiffelMark';
 import {useIptvStore} from '../store/useIptvStore';
 import {colors, fonts} from '../theme';
@@ -118,7 +118,7 @@ export function LoginScreen() {
               )}
             </PressableScale>
           </FadeIn>
-          <ContactLinks />
+          {showContact ? <ContactLinks /> : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

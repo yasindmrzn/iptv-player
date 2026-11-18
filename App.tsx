@@ -22,7 +22,7 @@ import {useFullscreenStore} from './src/store/useFullscreenStore';
 import {runBack} from './src/utils/backStack';
 import {useCatalogStore} from './src/store/useCatalogStore';
 import {useIptvStore} from './src/store/useIptvStore';
-import {brand} from './src/brand';
+import {brand, showContact} from './src/brand';
 import {EiffelMark} from './src/components/EiffelMark';
 import {colors, fonts} from './src/theme';
 import type {Channel, Episode, SeriesItem, VodItem} from './src/types';
@@ -243,9 +243,11 @@ export default function App() {
               </View>
             </View>
             <View style={styles.headerBtns}>
-              <Pressable onPress={() => setContactOpen(true)} hitSlop={10} style={styles.logout}>
-                <Text style={styles.contactText}>İletişim</Text>
-              </Pressable>
+              {showContact ? (
+                <Pressable onPress={() => setContactOpen(true)} hitSlop={10} style={styles.logout}>
+                  <Text style={styles.contactText}>İletişim</Text>
+                </Pressable>
+              ) : null}
               {activeProfile ? (
                 <Pressable
                   onPress={() => useIptvStore.getState().setProfileScreen(true)}

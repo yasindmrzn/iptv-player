@@ -1,0 +1,48 @@
+{
+  "appId": "com.iptvplayer.desktop",
+  "productName": "PashaPlay",
+  "copyright": "PashaPlay",
+  "directories": {
+    "output": "release-pasha",
+    "buildResources": "build"
+  },
+  "files": [
+    "electron/**",
+    "dist/**",
+    "build/icon-*.png",
+    "package.json"
+  ],
+  "asar": true,
+  "win": {
+    "icon": "build/icon-pasha.ico",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "signAndEditExecutable": true
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "perMachine": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "PashaPlay",
+    "artifactName": "PashaPlay-Windows-Kurulum.exe",
+    "installerIcon": "build/icon-pasha.ico",
+    "uninstallerIcon": "build/icon-pasha.ico"
+  },
+  "portable": {
+    "artifactName": "PashaPlay-Windows-Portable.exe"
+  }
+}

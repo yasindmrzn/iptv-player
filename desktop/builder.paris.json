@@ -1,0 +1,48 @@
+{
+  "appId": "com.parisplayer.desktop",
+  "productName": "ParisPlayer",
+  "copyright": "ParisPlayer",
+  "directories": {
+    "output": "release-paris",
+    "buildResources": "build"
+  },
+  "files": [
+    "electron/**",
+    "dist/**",
+    "build/icon-*.png",
+    "package.json"
+  ],
+  "asar": true,
+  "win": {
+    "icon": "build/icon-paris.ico",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "signAndEditExecutable": true
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "perMachine": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "ParisPlayer",
+    "artifactName": "ParisPlayer-Windows-Kurulum.exe",
+    "installerIcon": "build/icon-paris.ico",
+    "uninstallerIcon": "build/icon-paris.ico"
+  },
+  "portable": {
+    "artifactName": "ParisPlayer-Windows-Portable.exe"
+  }
+}

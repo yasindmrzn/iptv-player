@@ -1,8 +1,9 @@
 import {build} from 'esbuild';
-import {cpSync, mkdirSync, rmSync} from 'node:fs';
+import {cpSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+const BRAND = process.env.BRAND === 'paris' ? 'paris' : 'pasha';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
 const sh = f => path.join(here, 'shims', f);
@@ -48,6 +49,7 @@ await build({
   loader: {'.png': 'dataurl', '.ttf': 'file'},
   define: {
     __DEV__: 'false',
+    __BRAND__: JSON.stringify(BRAND),
     'process.env.NODE_ENV': '"production"',
     global: 'window',
   },
@@ -62,4 +64,8 @@ for (const f of ['Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
     path.join(here, `dist/fonts/Montserrat-${f}.ttf`),
   );
 }
-console.log('dist hazır');
+writeFileSync(
+  path.join(here, 'dist/brand.json'),
+  JSON.stringify({brand: BRAND, title: BRAND === 'paris' ? 'ParisPlayer' : 'PashaPlay'}),
+);
+console.log('dist hazır:', BRAND);

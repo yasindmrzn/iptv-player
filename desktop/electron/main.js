@@ -6,6 +6,12 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let win;
+let meta = {brand: 'pasha', title: 'PashaPlay'};
+try {
+  meta = require('../dist/brand.json');
+} catch {
+  /* varsayılan */
+}
 function create() {
   win = new BrowserWindow({
     width: 1366,
@@ -13,8 +19,8 @@ function create() {
     minWidth: 960,
     minHeight: 600,
     backgroundColor: '#0b0b0b',
-    title: 'PashaPlay',
-    icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    title: meta.title,
+    icon: path.join(__dirname, '..', 'build', `icon-${meta.brand}.png`),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
