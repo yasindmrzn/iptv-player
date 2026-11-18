@@ -12,6 +12,7 @@ import {CatalogScreen} from './src/screens/CatalogScreen';
 import {DashboardScreen} from './src/screens/DashboardScreen';
 import {FavoritesScreen} from './src/screens/FavoritesScreen';
 import {ProfilesScreen, Avatar} from './src/screens/ProfilesScreen';
+import {ExpiredScreen, isAccountBlocked} from './src/screens/ExpiredScreen';
 import {LoginScreen} from './src/screens/LoginScreen';
 import {MainScreen} from './src/screens/MainScreen';
 import {PlayerScreen} from './src/screens/PlayerScreen';
@@ -211,6 +212,9 @@ export default function App() {
   if (hydrated) {
     if (!account) {
       content = <LoginScreen />;
+    } else if (isAccountBlocked(info)) {
+      contentKey = 'expired';
+      content = <ExpiredScreen />;
     } else if (profileScreen) {
       contentKey = 'profiles';
       content = <ProfilesScreen />;

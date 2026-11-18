@@ -12,6 +12,7 @@ import {Pressable} from '../components/Focusable';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {useCatalogStore} from '../store/useCatalogStore';
+import {isWatched, progressKey, useProgressStore, watchedFraction} from '../store/useProgressStore';
 import {colors, fonts} from '../theme';
 import type {Episode, SeriesItem} from '../types';
 
@@ -27,6 +28,7 @@ export function SeriesDetailScreen({series, onBack, onPlay}: Props) {
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<number | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const progress = useProgressStore(st => st.items);
 
   useEffect(() => {
     let alive = true;
@@ -131,7 +133,19 @@ export function SeriesDetailScreen({series, onBack, onPlay}: Props) {
               <Text style={styles.epTitle} numberOfLines={2}>
                 {item.title}
               </Text>
-              {item.duration ? <Text style={styles.epMeta}>{item.duration}</Text> : null}
+              {(() => {
+                const pr = progress[progressKey(`ep-${item.id}`)];
+                const f = watchedFraction(pr);
+                const note = isWatched(pr)
+                  ? '✓ İzlendi'
+                  : f && f > 0.02
+                  ? `%${Math.round(f * 100)} izlendi`
+                  : '';
+                const text = [item.duration, note].filter(Boolean).join(' · ');
+                return text ? (
+                  <Text style={[styles.epMeta, isWatched(pr) && {color: colors.gold}]}>{text}</Text>
+                ) : null;
+              })()}
             </View>
             <Text style={styles.play}>▶</Text>
           </Pressable>

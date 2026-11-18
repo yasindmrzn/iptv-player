@@ -34,6 +34,7 @@ import {VLCPlayer} from 'react-native-vlc-media-player';
 import {useFullscreenStore} from '../store/useFullscreenStore';
 import {colors, fonts} from '../theme';
 import {hasVlc, isTv} from '../brand';
+import {resumeAt, useProgressStore} from '../store/useProgressStore';
 import {registerBack} from '../utils/backStack';
 import {setImmersive} from '../utils/immersive';
 import type {Channel, PlayerEngine} from '../types';
@@ -186,6 +187,9 @@ function VideoPlayerBase({
   const nativeRef = useRef<VideoRef>(null);
   const resumeRef = useRef(startAt);
   const positionRef = useRef(0);
+  const durationRef = useRef(0);
+  const lastSave = useRef(0);
+  const [resText, setResText] = useState('');
 
   const retryCount = useRef(0);
   const triedFallback = useRef(false);
@@ -212,7 +216,8 @@ function VideoPlayerBase({
     }
     retryCount.current = 0;
     triedFallback.current = false;
-    resumeRef.current = startAt;
+    resumeRef.current = startAt > 1 ? startAt : vod && channel ? resumeAt(channel.id) : 0;
+    durationRef.current = 0;
     engineRef.current = initialEngine;
     setEngine(initialEngine);
     // Not: Video/VLC bileşenlerinin key'i kanal kimliğini içerdiğinden kanal
@@ -387,11 +392,39 @@ function VideoPlayerBase({
 
   // Canlı yayının "bitmesi" kopma demektir → yeniden bağlan. Tek seferlik
   // dosyalarda (mp4/mkv vb.) bitiş normaldir, yeniden bağlanma döngüsüne girme.
+  /** Film/bölüm konumunu en fazla 5 sn'de bir kaydeder (force: hemen). */
+  const persistPos = useCallback(
+    (pos: number, force = false) => {
+      if (!vod || !channel || durationRef.current <= 0) {
+        return;
+      }
+      const now = Date.now();
+      if (!force && now - lastSave.current < 5000) {
+        return;
+      }
+      lastSave.current = now;
+      useProgressStore.getState().save(channel.id, pos, durationRef.current);
+    },
+    [vod, channel],
+  );
+  useEffect(
+    () => () => {
+      if (vod && positionRef.current > 0) {
+        persistPos(positionRef.current, true);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [channel?.id],
+  );
+
   const onEnded = useCallback(() => {
+    if (vod && channel && durationRef.current > 0) {
+      useProgressStore.getState().save(channel.id, durationRef.current, durationRef.current);
+    }
     if (!isFileKind(kind)) {
       handleFailure('Yayın sona erdi.');
     }
-  }, [kind, handleFailure]);
+  }, [kind, handleFailure, vod, channel]);
 
   const onNativeError = useCallback(
     (e: OnVideoErrorData) => {
@@ -566,7 +599,12 @@ function VideoPlayerBase({
           onReadyForDisplay={markPlaying}
           onBuffer={onNativeBuffer}
           onLoad={d => {
+            const ns = (d as {naturalSize?: {width: number; height: number}}).naturalSize;
+            if (ns && ns.height > 0) {
+              setResText(`${ns.height}p`);
+            }
             if (vod) {
+              durationRef.current = d.duration;
               setDuration(d.duration);
               if (resumeRef.current > 1) {
                 nativeRef.current?.seek(resumeRef.current);
@@ -578,6 +616,7 @@ function VideoPlayerBase({
             if (vod) {
               setPosition(p.currentTime);
               positionRef.current = p.currentTime;
+              persistPos(p.currentTime);
             }
             if (statusRef.current !== 'playing' && !paused) {
               markPlaying();
@@ -625,8 +664,10 @@ function VideoPlayerBase({
               // Kütüphane süreyi sürüme göre sn ya da ms verebilir: büyük değer ms sayılır
               const dur = e.duration > 100000 ? e.duration / 1000 : e.duration;
               setDuration(dur);
+              durationRef.current = dur;
               setPosition(e.position * dur);
               positionRef.current = e.position * dur;
+              persistPos(e.position * dur);
               if (resumeRef.current > 1 && dur > 0) {
                 setVlcSeek(resumeRef.current / dur);
                 resumeRef.current = 0;
@@ -699,12 +740,15 @@ function VideoPlayerBase({
             ) : (
               <View />
             )}
-            {!vod && (
-              <View style={styles.liveBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>CANLI</Text>
-              </View>
-            )}
+            <View style={styles.topRight}>
+              {resText ? <Text style={styles.resText}>{resText}</Text> : null}
+              {!vod && (
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>CANLI</Text>
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={styles.centerRow} pointerEvents="box-none">
@@ -970,6 +1014,8 @@ const styles = StyleSheet.create({
   backHit: {flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1},
   backGlyph: {color: '#fff', fontSize: 34, marginTop: -4},
   topTitle: {textShadowColor: 'rgba(0,0,0,0.85)', textShadowRadius: 5, textShadowOffset: {width: 0, height: 1}, color: '#fff', fontSize: 16, fontFamily: fonts.bold, flexShrink: 1},
+  topRight: {flexDirection: 'row', alignItems: 'center'},
+  resText: {color: colors.textDim, fontSize: 11, fontFamily: fonts.semi, marginRight: 8},
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',

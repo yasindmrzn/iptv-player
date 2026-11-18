@@ -35,6 +35,7 @@ export function MainScreen() {
   const insets = useSafeAreaInsets();
   const {width, height} = useWindowDimensions();
   const wide = width > height * 1.2;
+  const triple = width >= 1100;
 
   // ── Store ────────────────────────────────────────────────────────────────
   const channels = useIptvStore(s => s.channels);
@@ -238,8 +239,7 @@ export function MainScreen() {
     <EpgStrip channel={currentChannel} now={nowProg} next={nextProg} nowMs={nowMs} />
   );
 
-  const listBlock = (
-    <>
+  const searchBox = (
       <View style={styles.searchWrap}>
         <TextInput
           value={query}
@@ -253,14 +253,9 @@ export function MainScreen() {
           clearButtonMode="while-editing"
         />
       </View>
-      <CategoryTabs
-        groups={groups}
-        selected={category}
-        favoriteCount={favoriteCount}
-        counts={groupCounts}
-        total={channels.length}
-        onSelect={setCategory}
-      />
+  );
+
+  const channelList = (
       <FlatList
         ref={listRef}
         style={styles.list}
@@ -277,7 +272,47 @@ export function MainScreen() {
         keyboardDismissMode="on-drag"
         ListEmptyComponent={listEmpty}
       />
+  );
+
+  const listBlock = (
+    <>
+      {searchBox}
+      <CategoryTabs
+        groups={groups}
+        selected={category}
+        favoriteCount={favoriteCount}
+        counts={groupCounts}
+        total={channels.length}
+        onSelect={setCategory}
+      />
+      {channelList}
     </>
+  );
+
+  // Geniş masaüstü: Kategoriler | Kanal listesi | Önizleme + program bilgisi
+  const catItems = [
+    {key: CAT_ALL, label: 'Tüm Kanallar', count: channels.length},
+    {key: CAT_FAV, label: '★ Favoriler', count: favoriteCount},
+    ...groups.map(g => ({key: g, label: g, count: groupCounts[g] ?? 0})),
+  ];
+  const catColumn = (
+    <FlatList
+      data={catItems}
+      keyExtractor={c => c.key}
+      style={styles.catCol}
+      renderItem={({item}) => (
+        <Pressable
+          onPress={() => setCategory(item.key)}
+          style={[styles.catRow, category === item.key && styles.catRowActive]}>
+          <Text
+            style={[styles.catText, category === item.key && styles.catTextActive]}
+            numberOfLines={1}>
+            {item.label}
+          </Text>
+          <Text style={styles.catCount}>{item.count}</Text>
+        </Pressable>
+      )}
+    />
   );
 
   const zapBlock = (
@@ -329,6 +364,25 @@ export function MainScreen() {
       </Pressable>
     </View>
   );
+
+  if (triple) {
+    return (
+      <SafeAreaView style={styles.root} edges={[]}>
+        <View style={styles.wideRow}>
+          <View style={styles.tripleCats}>{catColumn}</View>
+          <View style={styles.tripleList}>
+            {searchBox}
+            {channelList}
+          </View>
+          <View style={styles.tripleMain}>
+            {playerBlock}
+            {epgBlock}
+            {zapBlock}
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Yatay (TV): solda oynatıcı + program bilgisi + kanal değiştir, sağda arama ve kanal listesi
   if (wide) {
@@ -408,6 +462,24 @@ const styles = StyleSheet.create({
   wideRow: {flex: 1, flexDirection: 'row'},
   wideLeft: {borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border},
   wideRight: {flex: 1},
+  tripleCats: {width: 230, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border},
+  tripleList: {width: 360, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border},
+  tripleMain: {flex: 1},
+  catCol: {flex: 1, paddingTop: 8},
+  catRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 8,
+    marginBottom: 2,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 10,
+  },
+  catRowActive: {backgroundColor: colors.accentSoft},
+  catText: {flex: 1, color: colors.textDim, fontSize: 13, fontFamily: fonts.semi},
+  catTextActive: {color: colors.gold},
+  catCount: {color: colors.textFaint, fontSize: 11, marginLeft: 8},
   zapBarWide: {borderTopWidth: 0, backgroundColor: 'transparent', marginTop: 8},
   zapBtn: {
     flexDirection: 'row',

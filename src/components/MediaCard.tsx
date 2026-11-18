@@ -2,6 +2,7 @@ import React, {memo, useRef, useState} from 'react';
 import {Animated, Image, Pressable, StyleSheet, Text, View} from 'react-native';
 
 import {colors, fonts, goldGlow} from '../theme';
+import {isWatched, progressKey, useProgressStore} from '../store/useProgressStore';
 import type {Channel, SeriesItem, VodItem} from '../types';
 
 /**
@@ -47,6 +48,7 @@ export const PosterCard = memo(function PosterCard({item, width, onPress, compac
   const {scale, focused, handlers} = useFocusFx();
   const height = Math.round(width * 1.5);
   const rating = item.rating && Number(item.rating) > 0 ? Number(item.rating).toFixed(1) : null;
+  const watched = useProgressStore(st => isWatched(st.items[progressKey(`vod-${item.id}`)]));
 
   return (
     <Pressable
@@ -68,6 +70,11 @@ export const PosterCard = memo(function PosterCard({item, width, onPress, compac
         {rating ? (
           <View style={styles.rating}>
             <Text style={styles.ratingText}>★ {rating}</Text>
+          </View>
+        ) : null}
+        {watched ? (
+          <View style={styles.watched}>
+            <Text style={styles.watchedText}>✓</Text>
           </View>
         ) : null}
         {focused ? (
@@ -136,6 +143,18 @@ export const ChannelCard = memo(function ChannelCard({
 });
 
 const styles = StyleSheet.create({
+  watched: {
+    position: 'absolute',
+    left: 6,
+    top: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  watchedText: {color: colors.onAccent, fontSize: 12, fontFamily: fonts.xbold},
   poster: {
     borderRadius: 14,
     overflow: 'hidden',

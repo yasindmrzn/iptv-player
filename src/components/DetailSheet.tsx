@@ -62,8 +62,13 @@ export function DetailSheet({visible, kind, item, onClose, onPrimary}: Props) {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={styles.sheet}>
-        {item.cover ? (
-          <Image source={{uri: item.cover}} style={styles.blurBg} blurRadius={28} resizeMode="cover" />
+        {details?.backdrop || item.cover ? (
+          <Image
+            source={{uri: details?.backdrop ?? item.cover}}
+            style={styles.blurBg}
+            blurRadius={details?.backdrop ? 6 : 28}
+            resizeMode="cover"
+          />
         ) : null}
         <View style={styles.overlay} />
         <View style={styles.grab} />

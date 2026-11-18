@@ -26,7 +26,7 @@ type Props = {
   onLoadStart?: () => void;
   onReadyForDisplay?: () => void;
   onBuffer?: (d: OnBufferData) => void;
-  onLoad?: (d: {duration: number}) => void;
+  onLoad?: (d: {duration: number; naturalSize?: {width: number; height: number}}) => void;
   onProgress?: (d: {currentTime: number}) => void;
   onError?: (e: OnVideoErrorData) => void;
   onEnd?: () => void;
@@ -242,7 +242,10 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
       style={{background: '#000', objectFit: fit, ...flat, position: 'absolute', inset: 0, width: '100%', height: '100%'}}
       onLoadedMetadata={e => {
         const v = e.currentTarget;
-        cb.current.onLoad?.({duration: Number.isFinite(v.duration) ? v.duration : 0});
+        cb.current.onLoad?.({
+          duration: Number.isFinite(v.duration) ? v.duration : 0,
+          naturalSize: {width: v.videoWidth, height: v.videoHeight},
+        });
         const tt: OnTextTracksData['textTracks'] = [];
         for (let i = 0; i < v.textTracks.length; i++) {
           tt.push({index: i, title: v.textTracks[i].label, language: v.textTracks[i].language});
@@ -250,6 +253,10 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
         if (tt.length) {
           cb.current.onTextTracks?.({textTracks: tt});
         }
+      }}
+      onResize={e => {
+        const v = e.currentTarget;
+        cb.current.onLoad?.({duration: Number.isFinite(v.duration) ? v.duration : 0, naturalSize: {width: v.videoWidth, height: v.videoHeight}});
       }}
       onPlaying={() => {
         cb.current.onBuffer?.({isBuffering: false});
