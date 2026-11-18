@@ -86,3 +86,38 @@ jobs:
             --title "PashaPlay + ParisPlayer + TV #${{ github.run_number }}" \
             --notes "Çoğu telefon için *-arm64.apk dosyasını kurun. Yalnızca eski 32-bit telefon/TV kutusu için *-arm32-eski-cihaz.apk kullanın. Android TV / TV kutusu için PashaPlay-TV-arm64.apk (yeni TV) veya PashaPlay-TV-arm32.apk (eski TV kutusu)." \
             --latest
+
+  windows:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Bağımlılıkları kur (masaüstü)
+        working-directory: desktop
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Windows uygulamasını derle (.exe)
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run dist
+
+      - name: Çıktıları listele
+        shell: bash
+        run: ls -la desktop/release/*.exe
+
+      - name: Release'e ekle
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "build-${{ github.run_number }}" \
+            desktop/release/PashaPlay-Windows-Kurulum.exe \
+            desktop/release/PashaPlay-Windows-Portable.exe \
+            --clobber

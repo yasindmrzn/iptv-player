@@ -1,0 +1,76 @@
+{
+  "name": "pashaplay-desktop",
+  "productName": "PashaPlay",
+  "version": "1.0.0",
+  "description": "PashaPlay - Premium IPTV (Windows)",
+  "author": "PashaPlay",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "bundle": "node build.mjs",
+    "dist": "node build.mjs && electron-builder --win nsis portable --x64 --publish never"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "hls.js": "^1.5.20",
+    "mpegts.js": "^1.8.0",
+    "pako": "^3.0.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native-web": "^0.21.2",
+    "zustand": "^5.0.16"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.25.0"
+  },
+  "build": {
+    "appId": "com.iptvplayer.desktop",
+    "productName": "PashaPlay",
+    "copyright": "PashaPlay",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "dist/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PashaPlay",
+      "artifactName": "PashaPlay-Windows-Kurulum.exe",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "PashaPlay-Windows-Portable.exe"
+    }
+  }
+}

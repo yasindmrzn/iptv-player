@@ -14,13 +14,23 @@ const RING = {
  * RN Pressable'ın yerine geçer: kumanda (D-pad) / klavye odağı geldiğinde altın bir halka çizer.
  * Android TV'de hangi öğenin seçili olduğu bu halkayla görülür.
  */
+// Web/masaüstü: fareyle tıklamada halka çıkmasın, yalnızca klavye (Tab/ok) odağında çıksın
+const ringWanted = (e: unknown): boolean => {
+  const t = (e as {target?: {matches?: (q: string) => boolean}} | undefined)?.target;
+  try {
+    return typeof t?.matches === 'function' ? t.matches(':focus-visible') : true;
+  } catch {
+    return true;
+  }
+};
+
 export function Pressable({style, onFocus, onBlur, ...rest}: PressableProps) {
   const [focused, setFocused] = useState(false);
   return (
     <RNPressable
       {...rest}
       onFocus={e => {
-        setFocused(true);
+        setFocused(ringWanted(e));
         onFocus?.(e);
       }}
       onBlur={e => {
