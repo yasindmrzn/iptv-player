@@ -35,33 +35,62 @@ type Props = {
   [k: string]: unknown;
 };
 
-function pick(url: string): 'hls' | 'ts' | 'file' {
+type Mode = 'hls' | 'ts' | 'file' | 'ff';
+type Win = {desktop?: {bridgePort?: () => Promise<number>}};
+
+function pick(url: string): {kind: 'hls' | 'ts' | 'file'; live: boolean} {
+  if (/^rtmp|^rtsp/i.test(url)) {
+    return {kind: 'file', live: true};
+  }
   const path = url.toLowerCase().replace(/^[a-z]+:\/\/[^/]+/, '').split(/[?#]/)[0];
   if (path.endsWith('.m3u8') || path.endsWith('.m3u')) {
-    return 'hls';
+    return {kind: 'hls', live: true};
   }
   if (path.endsWith('.ts') || /^\/live\//.test(path) || /^\/[^/]+\/[^/]+\/\d+$/.test(path)) {
-    return 'ts';
+    return {kind: 'ts', live: true};
   }
-  return 'file';
+  return {kind: 'file', live: false};
 }
+
+let bridge: Promise<number> | null = null;
+const getBridge = (): Promise<number> => {
+  if (!bridge) {
+    const f = (window as unknown as Win).desktop?.bridgePort;
+    bridge = f ? f().catch(() => 0) : Promise.resolve(0);
+  }
+  return bridge;
+};
 
 export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
   const el = useRef<HTMLVideoElement>(null);
   const cb = useRef(props);
   cb.current = props;
   const hlsRef = useRef<Hls | null>(null);
+  const modeRef = useRef<Mode>('file');
+  const offsetRef = useRef(0); // köprü + film: ss ofseti (sn)
+  const ffDur = useRef(0);
+  const ffUrl = useRef('');
+  const advance = useRef<(toFf?: boolean) => void>(() => {});
   const uri = props.source?.uri;
 
   useImperativeHandle(ref, () => ({
     seek(sec: number) {
-      if (el.current) {
-        el.current.currentTime = sec;
+      const v = el.current;
+      if (!v) {
+        return;
+      }
+      if (modeRef.current === 'ff' && ffDur.current > 0) {
+        offsetRef.current = sec;
+        v.src = `${ffUrl.current}&ss=${Math.floor(sec)}`;
+        v.load();
+        v.play().catch(() => {});
+      } else {
+        v.currentTime = sec;
       }
     },
   }));
 
-  // Kaynağı bağla (canlıda .m3u8 ↔ .ts karşılıklı yedek)
+  // Kaynağı bağla: doğrudan (hls.js / mpegts.js / <video>) → olmazsa yerel ffmpeg köprüsü
   useEffect(() => {
     const v = el.current;
     if (!v || !uri) {
@@ -69,19 +98,21 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
     }
     let dead = false;
     let ts: mpegts.Player | null = null;
+    let idx = 0;
+    let watch: ReturnType<typeof setTimeout> | null = null;
+    offsetRef.current = 0;
+    ffDur.current = 0;
     cb.current.onLoadStart?.();
 
-    const kind = pick(uri);
+    const {kind, live} = pick(uri);
     const swap = (to: 'm3u8' | 'ts') =>
       uri.replace(/\.(m3u8|ts)(?=$|[?#])/i, `.${to}`).replace(/^(.*\/\d+)$/, `$1.${to}`);
-    const plans: {mode: 'hls' | 'ts' | 'file'; url: string}[] =
-      kind === 'hls'
-        ? [{mode: 'hls', url: uri}, {mode: 'ts', url: swap('ts')}]
-        : kind === 'ts'
-        ? [{mode: 'ts', url: uri}, {mode: 'hls', url: swap('m3u8')}]
-        : [{mode: 'file', url: uri}];
 
     const teardown = () => {
+      if (watch) {
+        clearTimeout(watch);
+        watch = null;
+      }
       try {
         hlsRef.current?.destroy();
         hlsRef.current = null;
@@ -92,97 +123,165 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
       }
     };
 
-    const run = (i: number) => {
+    const start = async () => {
+      const port = await getBridge();
       if (dead) {
         return;
       }
-      teardown();
-      const plan = plans[i];
-      const last = i >= plans.length - 1;
-      const fail = (msg: string) => {
+      const ffBase = port ? `http://127.0.0.1:${port}` : '';
+      const direct: {mode: Mode; url: string}[] = /^rtmp|^rtsp/i.test(uri)
+        ? []
+        : kind === 'hls'
+        ? [{mode: 'hls', url: uri}, {mode: 'ts', url: swap('ts')}]
+        : kind === 'ts'
+        ? [{mode: 'ts', url: uri}, {mode: 'hls', url: swap('m3u8')}]
+        : [{mode: 'file', url: uri}];
+      const plans = [...direct];
+      if (ffBase) {
+        plans.push({mode: 'ff', url: `${ffBase}/${live ? 'live' : 'vod'}?u=${encodeURIComponent(uri)}`});
+      }
+      if (!plans.length) {
+        cb.current.onError?.({error: {errorString: 'Bu yayın türü desteklenmiyor.'}});
+        return;
+      }
+      const ffIndex = plans.length - 1;
+      const hasFf = plans[ffIndex].mode === 'ff';
+
+      const run = async (i: number) => {
         if (dead) {
           return;
         }
-        if (!last) {
-          run(i + 1);
-        } else {
-          cb.current.onError?.({error: {errorString: msg}});
+        teardown();
+        idx = i;
+        const plan = plans[i];
+        modeRef.current = plan.mode;
+        const last = i >= plans.length - 1;
+        const fail = (msg: string) => {
+          if (dead) {
+            return;
+          }
+          if (!last) {
+            void run(i + 1);
+          } else {
+            cb.current.onError?.({error: {errorString: msg}});
+          }
+        };
+        try {
+          if (plan.mode === 'hls' && Hls.isSupported()) {
+            const hls = new Hls({
+              maxBufferLength: 60,
+              maxMaxBufferLength: 120,
+              liveSyncDuration: 12,
+              liveMaxLatencyDuration: 40,
+              enableWorker: true,
+              manifestLoadingMaxRetry: 2,
+              levelLoadingMaxRetry: 3,
+              fragLoadingMaxRetry: 4,
+            });
+            hlsRef.current = hls;
+            hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+              cb.current.onAudioTracks?.({
+                audioTracks: hls.audioTracks.map((t, k) => ({index: k, title: t.name, language: t.lang, selected: k === hls.audioTrack})),
+              });
+            });
+            hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+              cb.current.onTextTracks?.({
+                textTracks: hls.subtitleTracks.map((t, k) => ({index: k, title: t.name, language: t.lang})),
+              });
+            });
+            hls.on(Hls.Events.ERROR, (_e, d) => {
+              if (!d.fatal) {
+                return;
+              }
+              if (d.type === Hls.ErrorTypes.MEDIA_ERROR && last) {
+                hls.recoverMediaError();
+                return;
+              }
+              const code = (d as {response?: {code?: number}}).response?.code;
+              fail(`Yayın alınamadı (${d.details}${code ? ` · HTTP ${code}` : ''})`);
+            });
+            hls.loadSource(plan.url);
+            hls.attachMedia(v);
+          } else if ((plan.mode === 'ts' || (plan.mode === 'ff' && live)) && mpegts.isSupported()) {
+            ts = mpegts.createPlayer(
+              {type: 'mpegts', isLive: true, url: plan.url},
+              {
+                enableWorker: true,
+                enableStashBuffer: true,
+                stashInitialSize: 1024 * 1024,
+                liveBufferLatencyChasing: true,
+                liveBufferLatencyMaxLatency: 40,
+                liveBufferLatencyMinRemain: 6,
+                lazyLoad: false,
+                autoCleanupSourceBuffer: true,
+              },
+            );
+            ts.on(mpegts.Events.ERROR, (_t: unknown, d: unknown, info?: {code?: number}) =>
+              fail(`Yayın alınamadı (${String(d)}${info?.code ? ` · HTTP ${info.code}` : ''})`),
+            );
+            ts.attachMediaElement(v);
+            ts.load();
+            v.play().catch(() => {});
+          } else if (plan.mode === 'ff') {
+            // Film / bölüm: süre ffmpeg probu ile alınır, parçalı MP4 olarak akar
+            ffUrl.current = plan.url;
+            const info = (await fetch(`${ffBase}/probe?u=${encodeURIComponent(uri)}`)
+              .then(r => r.json())
+              .catch(() => ({duration: 0}))) as {duration: number};
+            if (dead) {
+              return;
+            }
+            ffDur.current = info.duration || 0;
+            if (ffDur.current > 0) {
+              cb.current.onLoad?.({duration: ffDur.current});
+            }
+            v.src = plan.url;
+            v.load();
+            v.play().catch(() => {});
+          } else {
+            v.src = plan.url;
+            v.load();
+          }
+        } catch (e) {
+          fail(e instanceof Error ? e.message : 'Oynatıcı başlatılamadı.');
         }
       };
-      try {
-        if (plan.mode === 'hls' && Hls.isSupported()) {
-          const hls = new Hls({
-            maxBufferLength: 60,
-            maxMaxBufferLength: 120,
-            liveSyncDuration: 12,
-            liveMaxLatencyDuration: 40,
-            enableWorker: true,
-            manifestLoadingMaxRetry: 2,
-            levelLoadingMaxRetry: 3,
-            fragLoadingMaxRetry: 4,
-          });
-          hlsRef.current = hls;
-          hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
-            cb.current.onAudioTracks?.({
-              audioTracks: hls.audioTracks.map((t, k) => ({
-                index: k,
-                title: t.name,
-                language: t.lang,
-                selected: k === hls.audioTrack,
-              })),
-            });
-          });
-          hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
-            cb.current.onTextTracks?.({
-              textTracks: hls.subtitleTracks.map((t, k) => ({index: k, title: t.name, language: t.lang})),
-            });
-          });
-          hls.on(Hls.Events.ERROR, (_e, d) => {
-            if (!d.fatal) {
-              return;
-            }
-            if (d.type === Hls.ErrorTypes.MEDIA_ERROR && last) {
-              hls.recoverMediaError();
-              return;
-            }
-            const code = (d as {response?: {code?: number}}).response?.code;
-            fail(`Yayın alınamadı (${d.details}${code ? ` · HTTP ${code}` : ''})`);
-          });
-          hls.loadSource(plan.url);
-          hls.attachMedia(v);
-        } else if (plan.mode === 'ts' && mpegts.isSupported()) {
-          ts = mpegts.createPlayer(
-            {type: 'mpegts', isLive: true, url: plan.url},
-            {
-              enableWorker: true,
-              enableStashBuffer: true,
-              stashInitialSize: 1024 * 1024,
-              liveBufferLatencyChasing: true,
-              liveBufferLatencyMaxLatency: 40,
-              liveBufferLatencyMinRemain: 6,
-              lazyLoad: false,
-              autoCleanupSourceBuffer: true,
-            },
-          );
-          ts.on(mpegts.Events.ERROR, (_t: unknown, d: unknown, info?: {code?: number; msg?: string}) =>
-            fail(`Yayın alınamadı (${String(d)}${info?.code ? ` · HTTP ${info.code}` : ''})`),
-          );
-          ts.attachMediaElement(v);
-          ts.load();
-          v.play().catch(() => {});
+
+      advance.current = toFf => {
+        const next = toFf && hasFf ? ffIndex : idx + 1;
+        if (next <= ffIndex && next !== idx) {
+          void run(next);
         } else {
-          v.src = plan.url;
-          v.load();
+          cb.current.onError?.({error: {errorString: 'Yayın oynatılamadı.'}});
         }
-      } catch (e) {
-        fail(e instanceof Error ? e.message : 'Oynatıcı başlatılamadı.');
-      }
+      };
+      // Görüntü ya da ses çözülemiyorsa (HEVC, AC3 vb.) 4 sn sonra köprüye geç
+      (v as unknown as {__arm: () => void}).__arm = () => {
+        if (watch || !hasFf || modeRef.current === 'ff') {
+          return;
+        }
+        watch = setTimeout(() => {
+          watch = null;
+          if (dead || v.paused) {
+            return;
+          }
+          const noVideo = v.videoWidth === 0;
+          const noAudio =
+            (v as unknown as {webkitAudioDecodedByteCount?: number}).webkitAudioDecodedByteCount === 0 &&
+            v.currentTime > 1;
+          if (noVideo || noAudio) {
+            advance.current(true);
+          }
+        }, 4000);
+      };
+      void run(0);
     };
-    run(0);
+    void start();
 
     return () => {
       dead = true;
       teardown();
+      advance.current = () => {};
       try {
         v.removeAttribute('src');
         v.load();
@@ -234,6 +333,8 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
     | React.CSSProperties
     | undefined;
 
+  const size = (v: HTMLVideoElement) => ({width: v.videoWidth, height: v.videoHeight});
+
   return (
     <video
       ref={el}
@@ -242,10 +343,8 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
       style={{background: '#000', objectFit: fit, ...flat, position: 'absolute', inset: 0, width: '100%', height: '100%'}}
       onLoadedMetadata={e => {
         const v = e.currentTarget;
-        cb.current.onLoad?.({
-          duration: Number.isFinite(v.duration) ? v.duration : 0,
-          naturalSize: {width: v.videoWidth, height: v.videoHeight},
-        });
+        const dur = ffDur.current > 0 ? ffDur.current : Number.isFinite(v.duration) ? v.duration : 0;
+        cb.current.onLoad?.({duration: dur, naturalSize: size(v)});
         const tt: OnTextTracksData['textTracks'] = [];
         for (let i = 0; i < v.textTracks.length; i++) {
           tt.push({index: i, title: v.textTracks[i].label, language: v.textTracks[i].language});
@@ -256,24 +355,26 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
       }}
       onResize={e => {
         const v = e.currentTarget;
-        cb.current.onLoad?.({duration: Number.isFinite(v.duration) ? v.duration : 0, naturalSize: {width: v.videoWidth, height: v.videoHeight}});
+        const dur = ffDur.current > 0 ? ffDur.current : Number.isFinite(v.duration) ? v.duration : 0;
+        cb.current.onLoad?.({duration: dur, naturalSize: size(v)});
       }}
-      onPlaying={() => {
+      onPlaying={e => {
         cb.current.onBuffer?.({isBuffering: false});
         cb.current.onReadyForDisplay?.();
+        (e.currentTarget as unknown as {__arm?: () => void}).__arm?.();
       }}
       onWaiting={() => cb.current.onBuffer?.({isBuffering: true})}
-      onTimeUpdate={e => cb.current.onProgress?.({currentTime: e.currentTarget.currentTime})}
+      onTimeUpdate={e => cb.current.onProgress?.({currentTime: offsetRef.current + e.currentTarget.currentTime})}
       onEnded={() => cb.current.onEnd?.()}
       onError={e => {
         const m = e.currentTarget.error;
+        if (m && modeRef.current !== 'ff') {
+          // Codec/biçim hatası: köprüye geç
+          advance.current(m.code === 4 || m.code === 3);
+          return;
+        }
         cb.current.onError?.({
-          error: {
-            errorString:
-              m?.code === 4
-                ? 'Bu biçim oynatılamadı (codec desteklenmiyor).'
-                : m?.message || 'Yayın oynatılamadı.',
-          },
+          error: {errorString: m?.message || 'Yayın oynatılamadı.'},
         });
       }}
     />

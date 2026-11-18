@@ -1,5 +1,15 @@
 const {app, BrowserWindow, Menu, shell, ipcMain} = require('electron');
 const path = require('path');
+const ffserver = require('./ffserver');
+
+let bridgePort = 0;
+function ffmpegBinary() {
+  try {
+    return require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
+  } catch {
+    return null;
+  }
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -54,6 +64,7 @@ function create() {
   });
 }
 
+ipcMain.handle('bridge-port', () => bridgePort);
 ipcMain.on('set-fullscreen', (_e, on) => win && win.setFullScreen(!!on));
 
 app.on('second-instance', () => {
@@ -62,5 +73,15 @@ app.on('second-instance', () => {
     win.focus();
   }
 });
-app.whenReady().then(create);
+app.whenReady().then(async () => {
+  const bin = ffmpegBinary();
+  if (bin) {
+    try {
+      bridgePort = (await ffserver.start(bin)).port;
+    } catch {
+      bridgePort = 0;
+    }
+  }
+  create();
+});
 app.on('window-all-closed', () => app.quit());

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",
+    "ffmpeg-static": "^5.2.0",
     "hls.js": "^1.5.20",
     "mpegts.js": "^1.8.0",
     "pako": "^3.0.3",
@@ -22,9 +23,9 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
-    "esbuild": "^0.25.0",
-    "cross-env": "^7.0.3"
+    "esbuild": "^0.25.0"
   }
 }

@@ -10,7 +10,8 @@
     "electron/**",
     "dist/**",
     "build/icon-*.png",
-    "package.json"
+    "package.json",
+    "node_modules/ffmpeg-static/**"
   ],
   "asar": true,
   "win": {
@@ -44,5 +45,8 @@
   },
   "portable": {
     "artifactName": "PashaPlay-Windows-Portable.exe"
-  }
+  },
+  "asarUnpack": [
+    "node_modules/ffmpeg-static/**"
+  ]
 }
