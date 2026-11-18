@@ -17,7 +17,7 @@ import {LoginScreen} from './src/screens/LoginScreen';
 import {MainScreen} from './src/screens/MainScreen';
 import {PlayerScreen} from './src/screens/PlayerScreen';
 import {SeriesDetailScreen} from './src/screens/SeriesDetailScreen';
-import {episodeUrl, vodUrl} from './src/services/xtream';
+import {episodeUrl, fetchVodDetails, vodUrl} from './src/services/xtream';
 import {VideoPlayer} from './src/components/VideoPlayer';
 import {useFullscreenStore} from './src/store/useFullscreenStore';
 import {runBack} from './src/utils/backStack';
@@ -156,17 +156,33 @@ export default function App() {
     const {addRecent} = useIptvStore.getState();
     setDetail(null);
     if (detail.kind === 'vod') {
-      addRecent({kind: 'vod', item: detail.item, ts: Date.now()});
-      pushOverlay({
-        name: 'player',
-        channel: {
-          id: `vod-${detail.item.id}`,
-          name: detail.item.name,
-          url: vodUrl(acc, detail.item),
-          group: 'VOD',
-        },
-        title: detail.item.name,
-      });
+      const item = detail.item;
+      addRecent({kind: 'vod', item, ts: Date.now()});
+      const open = (url: string) =>
+        pushOverlay({
+          name: 'player',
+          channel: {id: `vod-${item.id}`, name: item.name, url, group: 'VOD'},
+          title: item.name,
+        });
+      if (item.directSource) {
+        open(vodUrl(acc, item));
+        return;
+      }
+      // Liste doğrudan kaynak vermediyse film ayrıntısındaki (movie_data) adrese bak
+      Promise.race([
+        fetchVodDetails(acc, item.id),
+        new Promise<null>(r => setTimeout(() => r(null), 4000)),
+      ])
+        .catch(() => null)
+        .then(d =>
+          open(
+            vodUrl(acc, {
+              ...item,
+              directSource: d?.directSource,
+              ext: d?.ext || item.ext,
+            }),
+          ),
+        );
     } else {
       addRecent({kind: 'series', item: detail.item, ts: Date.now()});
       pushOverlay({name: 'seriesDetail', series: detail.item});

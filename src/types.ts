@@ -41,6 +41,8 @@ export type VodItem = {
   categoryId: string;
   rating?: string;
   ext: string;
+  /** Panelin verdiği doğrudan kaynak adresi (varsa panel yolu yerine bu kullanılır) */
+  directSource?: string;
   /** Sunucuya eklenme zamanı (epoch sn) */
   added?: number;
 };
@@ -63,6 +65,7 @@ export type Episode = {
   title: string;
   ext: string;
   duration?: string;
+  directSource?: string;
 };
 
 export type Category = {id: string; name: string};
@@ -90,6 +93,9 @@ export type VodDetails = {
   /** YouTube video kimliği ya da tam bağlantı */
   trailer?: string;
   backdrop?: string;
+  /** get_vod_info → movie_data.direct_source */
+  directSource?: string;
+  ext?: string;
 };
 
 export type Profile = {id: string; name: string; color: string};

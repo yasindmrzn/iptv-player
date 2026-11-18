@@ -188,6 +188,12 @@ const toCats = (raw: unknown): Category[] =>
     name: c.category_name,
   }));
 
+/** Panel doğrudan kaynak verdiyse (http/https) onu döndürür. */
+export function directUrl(v: unknown): string | undefined {
+  const u = typeof v === 'string' ? v.trim() : '';
+  return /^https?:\/\//i.test(u) ? u : undefined;
+}
+
 function toEpoch(v: unknown): number | undefined {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : undefined;
@@ -209,6 +215,7 @@ export async function fetchVodItems(
       rating?: string | number | null;
       category_id?: string | number | null;
       container_extension?: string | null;
+      direct_source?: string | null;
       added?: string | number | null;
     }>
   >(
@@ -225,11 +232,15 @@ export async function fetchVodItems(
     categoryId: String(v.category_id ?? ''),
     rating: v.rating != null && v.rating !== '' ? String(v.rating) : undefined,
     ext: v.container_extension || 'mp4',
+    directSource: directUrl(v.direct_source),
     added: toEpoch(v.added),
   }));
 }
 
 export function vodUrl(c: XtreamCredentials, v: VodItem): string {
+  if (v.directSource) {
+    return v.directSource;
+  }
   return `${normalizeServer(c.server)}/movie/${encodeURIComponent(
     c.username,
   )}/${encodeURIComponent(c.password)}/${v.id}.${v.ext}`;
@@ -279,6 +290,7 @@ type RawEpisode = {
   title?: string;
   season?: string | number;
   container_extension?: string;
+  direct_source?: string;
   info?: {duration?: string};
 };
 
@@ -301,6 +313,7 @@ export async function fetchSeriesEpisodes(
       title: e.title || `Bölüm ${e.episode_num ?? out.length + 1}`,
       ext: e.container_extension || 'mp4',
       duration: e.info?.duration,
+      directSource: directUrl(e.direct_source),
     });
   };
 
@@ -316,6 +329,9 @@ export async function fetchSeriesEpisodes(
 }
 
 export function episodeUrl(c: XtreamCredentials, e: Episode): string {
+  if (e.directSource) {
+    return e.directSource;
+  }
   return `${normalizeServer(c.server)}/series/${encodeURIComponent(
     c.username,
   )}/${encodeURIComponent(c.password)}/${e.id}.${e.ext}`;
@@ -328,8 +344,10 @@ export async function fetchVodDetails(
 ): Promise<VodDetails> {
   const data = await getJson<{
     info?: Record<string, unknown>;
+    movie_data?: Record<string, unknown>;
   }>(apiUrl(c, 'get_vod_info', `&vod_id=${encodeURIComponent(vodId)}`), 30000);
   const i = data?.info ?? {};
+  const md = data?.movie_data ?? {};
   const str = (v: unknown) =>
     typeof v === 'string' || typeof v === 'number'
       ? String(v).trim() || undefined
@@ -345,6 +363,8 @@ export async function fetchVodDetails(
     director: str(i.director),
     trailer: str(i.youtube_trailer) ?? str(i.trailer),
     backdrop: Array.isArray(backdropRaw) ? str(backdropRaw[0]) : str(backdropRaw),
+    directSource: directUrl(md.direct_source) ?? directUrl(i.direct_source),
+    ext: str(md.container_extension),
   };
 }
 

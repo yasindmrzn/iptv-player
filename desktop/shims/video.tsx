@@ -100,6 +100,7 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
     let ts: mpegts.Player | null = null;
     let idx = 0;
     let watch: ReturnType<typeof setTimeout> | null = null;
+    let stall: ReturnType<typeof setTimeout> | null = null;
     offsetRef.current = 0;
     ffDur.current = 0;
     cb.current.onLoadStart?.();
@@ -109,6 +110,10 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
       uri.replace(/\.(m3u8|ts)(?=$|[?#])/i, `.${to}`).replace(/^(.*\/\d+)$/, `$1.${to}`);
 
     const teardown = () => {
+      if (stall) {
+        clearTimeout(stall);
+        stall = null;
+      }
       if (watch) {
         clearTimeout(watch);
         watch = null;
@@ -129,12 +134,14 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
         return;
       }
       const ffBase = port ? `http://127.0.0.1:${port}` : '';
+      // .m3u8 ↔ .ts yedeği yalnızca Xtream canlı yolunda anlamlı; film/dizi (direct source) için değil
+      const xtLive = /\/live\/|\/\d+\.(m3u8|ts)(?=$|[?#])/i.test(uri);
       const direct: {mode: Mode; url: string}[] = /^rtmp|^rtsp/i.test(uri)
         ? []
         : kind === 'hls'
-        ? [{mode: 'hls', url: uri}, {mode: 'ts', url: swap('ts')}]
+        ? [{mode: 'hls', url: uri}, ...(xtLive ? [{mode: 'ts' as Mode, url: swap('ts')}] : [])]
         : kind === 'ts'
-        ? [{mode: 'ts', url: uri}, {mode: 'hls', url: swap('m3u8')}]
+        ? [{mode: 'ts', url: uri}, ...(xtLive ? [{mode: 'hls' as Mode, url: swap('m3u8')}] : [])]
         : [{mode: 'file', url: uri}];
       const plans = [...direct];
       if (ffBase) {
@@ -156,6 +163,15 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
         const plan = plans[i];
         modeRef.current = plan.mode;
         const last = i >= plans.length - 1;
+        // Doğrudan oynatma 12 sn içinde başlamazsa (takılma / sessiz hata) köprüye geç
+        if (plan.mode !== 'ff' && hasFf) {
+          stall = setTimeout(() => {
+            stall = null;
+            if (!dead && v.readyState < 3) {
+              advance.current(true);
+            }
+          }, 12000);
+        }
         const fail = (msg: string) => {
           if (dead) {
             return;
