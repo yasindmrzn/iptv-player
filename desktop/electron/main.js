@@ -30,6 +30,10 @@ function create() {
       autoplayPolicy: 'no-user-gesture-required',
     },
   });
+  // Bazı paneller "Electron" kimliğini reddeder: normal Chrome gibi bağlan
+  const ua = win.webContents.getUserAgent().replace(/\s(Electron|[A-Za-z-]*[Pp]layer|pashaplay-desktop)\/\S+/g, '');
+  win.webContents.setUserAgent(ua);
+  win.webContents.session.setUserAgent(ua);
   Menu.setApplicationMenu(null);
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   // Dış bağlantılar (WhatsApp, e-posta, fragman) varsayılan tarayıcıda açılır

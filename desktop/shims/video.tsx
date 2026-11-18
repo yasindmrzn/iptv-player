@@ -61,89 +61,129 @@ export const Video = forwardRef<VideoRef, Props>(function Video(props, ref) {
     },
   }));
 
-  // Kaynağı bağla
+  // Kaynağı bağla (canlıda .m3u8 ↔ .ts karşılıklı yedek)
   useEffect(() => {
     const v = el.current;
     if (!v || !uri) {
       return;
     }
-    let ts: mpegts.Player | null = null;
     let dead = false;
-    const fail = (msg: string) => !dead && cb.current.onError?.({error: {errorString: msg}});
+    let ts: mpegts.Player | null = null;
     cb.current.onLoadStart?.();
+
     const kind = pick(uri);
+    const swap = (to: 'm3u8' | 'ts') =>
+      uri.replace(/\.(m3u8|ts)(?=$|[?#])/i, `.${to}`).replace(/^(.*\/\d+)$/, `$1.${to}`);
+    const plans: {mode: 'hls' | 'ts' | 'file'; url: string}[] =
+      kind === 'hls'
+        ? [{mode: 'hls', url: uri}, {mode: 'ts', url: swap('ts')}]
+        : kind === 'ts'
+        ? [{mode: 'ts', url: uri}, {mode: 'hls', url: swap('m3u8')}]
+        : [{mode: 'file', url: uri}];
 
-    try {
-      if (kind === 'hls' && Hls.isSupported()) {
-        const hls = new Hls({
-          maxBufferLength: 60,
-          maxMaxBufferLength: 120,
-          liveSyncDuration: 12,
-          liveMaxLatencyDuration: 40,
-          enableWorker: true,
-          manifestLoadingMaxRetry: 4,
-          levelLoadingMaxRetry: 4,
-          fragLoadingMaxRetry: 6,
-        });
-        hlsRef.current = hls;
-        hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
-          cb.current.onAudioTracks?.({
-            audioTracks: hls.audioTracks.map((t, i) => ({
-              index: i,
-              title: t.name,
-              language: t.lang,
-              selected: i === hls.audioTrack,
-            })),
-          });
-        });
-        hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
-          cb.current.onTextTracks?.({
-            textTracks: hls.subtitleTracks.map((t, i) => ({index: i, title: t.name, language: t.lang})),
-          });
-        });
-        hls.on(Hls.Events.ERROR, (_e, d) => {
-          if (!d.fatal) {
-            return;
-          }
-          if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            hls.recoverMediaError();
-          } else {
-            fail(`${d.type}: ${d.details}`);
-          }
-        });
-        hls.loadSource(uri);
-        hls.attachMedia(v);
-      } else if (kind === 'ts' && mpegts.isSupported()) {
-        ts = mpegts.createPlayer(
-          {type: 'mpegts', isLive: true, url: uri},
-          {
-            enableWorker: true,
-            enableStashBuffer: true,
-            stashInitialSize: 1024 * 1024,
-            liveBufferLatencyChasing: true,
-            liveBufferLatencyMaxLatency: 40,
-            liveBufferLatencyMinRemain: 6,
-            lazyLoad: false,
-            autoCleanupSourceBuffer: true,
-          },
-        );
-        ts.on(mpegts.Events.ERROR, (_t: unknown, d: unknown) => fail(`Yayın hatası: ${String(d)}`));
-        ts.attachMediaElement(v);
-        ts.load();
-      } else {
-        v.src = uri;
-        v.load();
-      }
-    } catch (e) {
-      fail(e instanceof Error ? e.message : 'Oynatıcı başlatılamadı.');
-    }
-
-    return () => {
-      dead = true;
+    const teardown = () => {
       try {
         hlsRef.current?.destroy();
         hlsRef.current = null;
         ts?.destroy();
+        ts = null;
+      } catch {
+        /* yok say */
+      }
+    };
+
+    const run = (i: number) => {
+      if (dead) {
+        return;
+      }
+      teardown();
+      const plan = plans[i];
+      const last = i >= plans.length - 1;
+      const fail = (msg: string) => {
+        if (dead) {
+          return;
+        }
+        if (!last) {
+          run(i + 1);
+        } else {
+          cb.current.onError?.({error: {errorString: msg}});
+        }
+      };
+      try {
+        if (plan.mode === 'hls' && Hls.isSupported()) {
+          const hls = new Hls({
+            maxBufferLength: 60,
+            maxMaxBufferLength: 120,
+            liveSyncDuration: 12,
+            liveMaxLatencyDuration: 40,
+            enableWorker: true,
+            manifestLoadingMaxRetry: 2,
+            levelLoadingMaxRetry: 3,
+            fragLoadingMaxRetry: 4,
+          });
+          hlsRef.current = hls;
+          hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+            cb.current.onAudioTracks?.({
+              audioTracks: hls.audioTracks.map((t, k) => ({
+                index: k,
+                title: t.name,
+                language: t.lang,
+                selected: k === hls.audioTrack,
+              })),
+            });
+          });
+          hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+            cb.current.onTextTracks?.({
+              textTracks: hls.subtitleTracks.map((t, k) => ({index: k, title: t.name, language: t.lang})),
+            });
+          });
+          hls.on(Hls.Events.ERROR, (_e, d) => {
+            if (!d.fatal) {
+              return;
+            }
+            if (d.type === Hls.ErrorTypes.MEDIA_ERROR && last) {
+              hls.recoverMediaError();
+              return;
+            }
+            const code = (d as {response?: {code?: number}}).response?.code;
+            fail(`Yayın alınamadı (${d.details}${code ? ` · HTTP ${code}` : ''})`);
+          });
+          hls.loadSource(plan.url);
+          hls.attachMedia(v);
+        } else if (plan.mode === 'ts' && mpegts.isSupported()) {
+          ts = mpegts.createPlayer(
+            {type: 'mpegts', isLive: true, url: plan.url},
+            {
+              enableWorker: true,
+              enableStashBuffer: true,
+              stashInitialSize: 1024 * 1024,
+              liveBufferLatencyChasing: true,
+              liveBufferLatencyMaxLatency: 40,
+              liveBufferLatencyMinRemain: 6,
+              lazyLoad: false,
+              autoCleanupSourceBuffer: true,
+            },
+          );
+          ts.on(mpegts.Events.ERROR, (_t: unknown, d: unknown, info?: {code?: number; msg?: string}) =>
+            fail(`Yayın alınamadı (${String(d)}${info?.code ? ` · HTTP ${info.code}` : ''})`),
+          );
+          ts.attachMediaElement(v);
+          ts.load();
+          v.play().catch(() => {});
+        } else {
+          v.src = plan.url;
+          v.load();
+        }
+      } catch (e) {
+        fail(e instanceof Error ? e.message : 'Oynatıcı başlatılamadı.');
+      }
+    };
+    run(0);
+
+    return () => {
+      dead = true;
+      teardown();
+      try {
         v.removeAttribute('src');
         v.load();
       } catch {

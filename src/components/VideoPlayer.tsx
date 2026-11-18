@@ -33,7 +33,7 @@ import {VLCPlayer} from 'react-native-vlc-media-player';
 
 import {useFullscreenStore} from '../store/useFullscreenStore';
 import {colors, fonts} from '../theme';
-import {isTv} from '../brand';
+import {hasVlc, isTv} from '../brand';
 import {registerBack} from '../utils/backStack';
 import {setImmersive} from '../utils/immersive';
 import type {Channel, PlayerEngine} from '../types';
@@ -259,7 +259,7 @@ function VideoPlayerBase({
         return;
       }
       // 1) ExoPlayer/AVPlayer çözemediyse (ör. DTS, VP8, AV1 yok) VLC'ye geç
-      if (engineRef.current === 'native' && !triedFallback.current) {
+      if (hasVlc && engineRef.current === 'native' && !triedFallback.current) {
         triedFallback.current = true;
         engineRef.current = 'vlc';
         setEngine('vlc');
@@ -636,7 +636,13 @@ function VideoPlayerBase({
               markPlaying();
             }
           }}
-          onError={() => handleFailure('VLC yayını oynatamadı.')}
+          onError={() =>
+            handleFailure(
+              hasVlc
+                ? 'VLC yayını oynatamadı.'
+                : 'Bu yayın türü (RTMP/RTSP) Windows sürümünde desteklenmiyor.',
+            )
+          }
           onEnd={onEnded}
         />
       )}

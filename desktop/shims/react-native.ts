@@ -5,7 +5,7 @@ export * from 'react-native-web';
 declare const __BRAND__: string;
 /** Marka ve iletişim ayarı derleme zamanında seçilir (src/brand.ts bunu okur). */
 export const NativeModules = {
-  Immersive: {brand: __BRAND__, tv: false, noContact: __BRAND__ === 'paris'},
+  Immersive: {brand: __BRAND__, tv: false, noVlc: true, noContact: __BRAND__ === 'paris'},
 };
 
 type Btn = {text?: string; style?: string; onPress?: () => void};

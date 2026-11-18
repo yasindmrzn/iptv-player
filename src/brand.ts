@@ -92,8 +92,11 @@ const BRANDS: Record<BrandId, Brand> = {
 };
 
 const native = NativeModules.Immersive as
-  | {brand?: string; tv?: boolean; noContact?: boolean}
+  | {brand?: string; tv?: boolean; noContact?: boolean; noVlc?: boolean}
   | undefined;
+
+/** libVLC yedek motoru var mı? (masaüstü sürümünde yok) */
+export const hasVlc = native?.noVlc !== true;
 
 /** İletişim butonu/bağlantıları (bayi dağıtımı olan masaüstü sürümünde gizlenir) */
 export const showContact = native?.noContact !== true;
