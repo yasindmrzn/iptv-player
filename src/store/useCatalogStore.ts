@@ -104,19 +104,73 @@ export const useCatalogStore = create<State>((set, get) => {
     }
   };
 
+  /**
+   * Tüm liste. Tek istek (çok büyük listelerde) zaman aşımına uğrarsa kategori kategori
+   * (4 paralel) çekilip birleştirilir; böylece sunucudaki TÜM içerik görünür.
+   */
+  const loadAllByCategory = async (mode: Mode, account: NonNullable<ReturnType<typeof useIptvStore.getState>['account']>) => {
+    let cats = get()[mode].cats;
+    if (!cats.length) {
+      cats = await withRetry(() => fetchers[mode].cats(account));
+      patch(mode, {cats, catsLoaded: true});
+    }
+    if (!cats.length) {
+      return [];
+    }
+    const seen = new Set<string>();
+    const all: AnyItem[] = [];
+    let idx = 0;
+    let okCount = 0;
+    const worker = async () => {
+      while (idx < cats.length) {
+        const c = cats[idx++];
+        try {
+          const part = await withRetry(
+            () => (fetchers[mode].items as (a: unknown, id?: string) => Promise<AnyItem[]>)(account, c.id),
+            2,
+            1000,
+          );
+          okCount++;
+          part.forEach(i => {
+            if (!seen.has(i.id)) {
+              seen.add(i.id);
+              all.push(i);
+            }
+          });
+          patch(mode, {items: [...all]});
+        } catch {
+          /* bu kategori atlanır, diğerleri sürer */
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    if (okCount === 0) {
+      throw new Error(MSG[mode]);
+    }
+    return all;
+  };
+
   const loadAll = async (mode: Mode, force = false) => {
     const account = useIptvStore.getState().account;
     const cur = get()[mode];
-    if (!account || cur.loading || (cur.loaded && !force)) {
+    if (!account || (cur.loading && !force) || (cur.loaded && !force)) {
       return;
     }
     patch(mode, {loading: true, error: null});
     try {
-      const items = await withRetry(
-        () => (fetchers[mode].items as (c: unknown) => Promise<AnyItem[]>)(account),
-        3,
-        1500,
-      );
+      let items: AnyItem[];
+      try {
+        items = await withRetry(
+          () => (fetchers[mode].items as (c: unknown) => Promise<AnyItem[]>)(account),
+          2,
+          1500,
+        );
+        if (!Array.isArray(items) || items.length === 0) {
+          throw new Error('boş');
+        }
+      } catch {
+        items = await loadAllByCategory(mode, account);
+      }
       patch(mode, {items, loading: false, loaded: true, error: null});
     } catch (e) {
       // Başarısız olursa eldeki liste korunur; klasörler yine de çalışır

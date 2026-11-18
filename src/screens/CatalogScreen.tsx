@@ -120,7 +120,7 @@ export function CatalogScreen({mode, onSelect}: Props) {
     if (open || debounced.length < 2 || !slice.loaded) {
       return [];
     }
-    return (slice.items as Item[]).filter(i => i.name.toLowerCase().includes(debounced)).slice(0, 60);
+    return (slice.items as Item[]).filter(i => i.name.toLowerCase().includes(debounced)).slice(0, 400);
   }, [open, debounced, slice.items, slice.loaded]);
 
   const shown = useMemo(() => {

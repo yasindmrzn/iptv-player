@@ -1,5 +1,5 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {Alert, AppState, BackHandler, StatusBar, StyleSheet, Text, View} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {ActivityIndicator, Alert, AppState, BackHandler, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {Pressable} from './src/components/Focusable';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 
@@ -45,6 +45,16 @@ function PowerIcon() {
   );
 }
 
+/** Yenile simgesi: ok başlı halka (View ile çizilir). */
+function RefreshIcon() {
+  return (
+    <View style={styles.refBox}>
+      <View style={styles.refRing} />
+      <View style={styles.refArrow} />
+    </View>
+  );
+}
+
 function formatExpiry(ms?: number): string | null {
   if (!ms) {
     return null;
@@ -61,6 +71,14 @@ export default function App() {
   const hydrated = useIptvStore(s => s.hydrated);
   const account = useIptvStore(s => s.account);
   const info = useIptvStore(s => s.accountInfo);
+  const liveLoading = useIptvStore(s => s.loading);
+  const liveCount = useIptvStore(s => s.channels.length);
+  const vodSlice = useCatalogStore(s => s.vod);
+  const seriesSlice = useCatalogStore(s => s.series);
+  const busy =
+    liveLoading || vodSlice.loading || seriesSlice.loading || vodSlice.catsLoading || seriesSlice.catsLoading;
+  const [note, setNote] = useState<string | null>(null);
+  const wasBusy = useRef(false);
 
   const [tab, setTab] = useState<TabKey>('home');
   const [overlays, setOverlays] = useState<Overlay[]>([]);
@@ -78,6 +96,23 @@ export default function App() {
 
   // Yeni eklenen kanal/film/dizilerin otomatik görünmesi: her açılışta ve
   // uygulama uzun süre arka planda kaldıktan sonra öne gelince listeler sunucudan yeniden çekilir.
+  useEffect(() => {
+    if (wasBusy.current && !busy) {
+      const n = (x: number) => x.toLocaleString('tr-TR');
+      const bad = vodSlice.error || seriesSlice.error;
+      setNote(
+        bad
+          ? `Bazı listeler alınamadı · ${n(liveCount)} kanal · ${n(vodSlice.items.length)} film · ${n(seriesSlice.items.length)} dizi`
+          : `Güncellendi · ${n(liveCount)} kanal · ${n(vodSlice.items.length)} film · ${n(seriesSlice.items.length)} dizi`,
+      );
+      const t = setTimeout(() => setNote(null), 9000);
+      wasBusy.current = busy;
+      return () => clearTimeout(t);
+    }
+    wasBusy.current = busy;
+    return undefined;
+  }, [busy]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const refreshAll = useCallback(() => {
     void useIptvStore.getState().refreshAccount();
     void useIptvStore.getState().loadLive(true);
@@ -259,10 +294,19 @@ export default function App() {
               <EiffelMark height={34} />
               <View>
               <Text style={[styles.logo, brand.name.length > 9 && styles.logoLong]}>{brand.name}</Text>
-              {expiry ? <Text style={styles.expiry}>Bitiş · {expiry}</Text> : null}
+              {busy ? (
+                <Text style={styles.expiry}>Güncelleniyor…</Text>
+              ) : note ? (
+                <Text style={[styles.expiry, {color: colors.gold}]}>{note}</Text>
+              ) : expiry ? (
+                <Text style={styles.expiry}>Bitiş · {expiry}</Text>
+              ) : null}
               </View>
             </View>
             <View style={styles.headerBtns}>
+              <Pressable onPress={refreshAll} disabled={busy} hitSlop={10} style={styles.powerBtn}>
+                {busy ? <ActivityIndicator size="small" color={colors.gold} /> : <RefreshIcon />}
+              </Pressable>
               {showContact ? (
                 <Pressable onPress={() => setContactOpen(true)} hitSlop={10} style={styles.logout}>
                   <Text style={styles.contactText}>İletişim</Text>
@@ -381,6 +425,29 @@ const styles = StyleSheet.create({
   },
   powerGap: {position: 'absolute', top: -1, width: 7, height: 6, backgroundColor: colors.surfaceAlt},
   powerLine: {position: 'absolute', top: -1, width: 2, height: 9, borderRadius: 1, backgroundColor: colors.gold},
+  refBox: {width: 18, height: 18, alignItems: 'center', justifyContent: 'center'},
+  refRing: {
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.gold,
+    borderTopColor: 'transparent',
+  },
+  refArrow: {
+    position: 'absolute',
+    top: 0,
+    right: 1,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderBottomWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: colors.gold,
+    transform: [{rotate: '45deg'}],
+  },
   contactText: {color: colors.gold, fontSize: 12, fontFamily: fonts.semi},
   body: {flex: 1},
 });

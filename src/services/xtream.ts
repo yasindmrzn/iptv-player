@@ -105,10 +105,42 @@ export function xtreamLiveUrl(
 export async function fetchXtreamChannels(
   creds: XtreamCredentials,
 ): Promise<{channels: Channel[]; groups: string[]}> {
-  const [cats, streams] = await Promise.all([
-    getJson<XtreamCategory[]>(apiUrl(creds, 'get_live_categories')),
-    getJson<XtreamLiveStream[]>(apiUrl(creds, 'get_live_streams'), 60000),
-  ]);
+  const cats = await getJson<XtreamCategory[]>(apiUrl(creds, 'get_live_categories'));
+  let streams: XtreamLiveStream[] | undefined;
+  try {
+    const all = await getJson<XtreamLiveStream[]>(apiUrl(creds, 'get_live_streams'), 90000);
+    streams = Array.isArray(all) && all.length > 0 ? all : undefined;
+  } catch {
+    streams = undefined;
+  }
+  // Tek istek zaman aşımına uğradıysa / boş döndüyse kategori kategori çek (4 paralel)
+  if (!streams && Array.isArray(cats) && cats.length) {
+    const acc: XtreamLiveStream[] = [];
+    const seen = new Set<string>();
+    let idx = 0;
+    const worker = async () => {
+      while (idx < cats.length) {
+        const c = cats[idx++];
+        try {
+          const part = await getJson<XtreamLiveStream[]>(
+            apiUrl(creds, 'get_live_streams', `&category_id=${encodeURIComponent(String(c.category_id))}`),
+            45000,
+          );
+          (Array.isArray(part) ? part : []).forEach(x => {
+            const k = String(x.stream_id);
+            if (!seen.has(k)) {
+              seen.add(k);
+              acc.push(x);
+            }
+          });
+        } catch {
+          /* bu kategori atlanır */
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    streams = acc;
+  }
 
   if (!Array.isArray(streams)) {
     throw new Error('Kanal listesi alınamadı (hesap süresi dolmuş olabilir).');
