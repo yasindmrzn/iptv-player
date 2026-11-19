@@ -4,6 +4,15 @@ Yalnızca Xtream Codes girişli, EPG'li IPTV oynatıcı. Açılışta menü: CAN
 Android ve iOS klasörleri hazırdır; ek proje oluşturmanız gerekmez.
 Gerekli ayarlar uygulanmıştır: dikey kilit, `minSdkVersion 26`, http yayınlar için cleartext izni.
 
+## PashaPlayer uygulaması
+
+PashaPlayer; Android, Android TV ve Windows için hazırlanmış, Xtream Codes girişli bir IPTV oynatıcısıdır
+(CANLI · VOD · SERİES, EPG, kaldığın yerden devam, 4K/HEVC desteği).
+Uygulama içerik sağlamaz; kullanıcı kendi Xtream bilgileriyle giriş yapar.
+
+- **İndirme:** [Son sürüm (Releases)](https://github.com/yasindmrzn/iptv-player/releases/latest)
+- **Kurulum rehberi (Smart TV, Android TV, Fire Stick, Windows):** [pashaiptv.com](https://pashaiptv.com/smart-tv-iptv-kurulumu.html)
+
 ## Çalıştırma (Android Studio)
 
 Gereken: Node.js 22.11+, JDK 17, Android Studio (SDK + emülatör ya da USB hata ayıklamalı telefon).
